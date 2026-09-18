@@ -534,7 +534,6 @@ class Character {
       });
     }
 
-    // DOM変更を常時監視して、キャンバスがbody直下に作られた瞬間に即移動
     const observer = new MutationObserver(relocateCanvas);
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("DOMContentLoaded", relocateCanvas);
@@ -543,7 +542,6 @@ class Character {
 
   <!-- 4. 生徒のスクリプト実行 -->
   <script>
-    // 生徒が定義する setup の完了時にも即座にキャンバス格納を実行するフック
     window.addEventListener('load', () => {
       if (typeof window.setup === 'function') {
         const originalSetup = window.setup;
