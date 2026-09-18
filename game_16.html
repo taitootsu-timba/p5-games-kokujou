@@ -19,1888 +19,2094 @@
 </head>
 <body>
   <a href="index.html" class="back-link">← 一覧に戻る</a>
-  <h1>作者: 門田</h1>
-  <p>迷路　重くて動きませんでした</p>
+  <h1>作者: TR</h1>
+  <p>げ</p>
   
-  <script>// ============================================================
-// 3D FPS MAZE
-// p5.js
-// ============================================================
+  <script>// ==========================================
+// ZOMBIE SURVIVAL - p5.js
+// ==========================================
 
+let zombies = [];
+let bullets = [];
+let particles = [];
+let casings = [];
+let bloodSplats = [];
 
-// ============================================================
-// MAZE
-// ============================================================
+let score = 0;
+let hp = 100;
 
-const maze = [
-  "###############",
-  "#P            #",
-  "# ##### ##### #",
-  "#     #       #",
-  "##### # #######",
-  "#     #       #",
-  "# ### ##### # #",
-  "# #         # #",
-  "# # ####### # #",
-  "# #       #   #",
-  "# ####### #####",
-  "#             #",
-  "###############"
-];
+let ammo = 30;
+const maxAmmo = 30;
 
+let reloading = false;
+let reloadTimer = 0;
 
-// ============================================================
-// SETTINGS
-// ============================================================
+let shake = 0;
+let muzzleFlash = 0;
 
-const CELL_SIZE = 80;
-const WALL_HEIGHT = 120;
+let gameStarted = false;
+let gameOver = false;
 
-const PLAYER_HEIGHT = 45;
-const PLAYER_RADIUS = 18;
-
-const MOVE_SPEED = 3.5;
-
-const MOUSE_SENSITIVITY = 0.0025;
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-let player = {
-  x: 0,
-  z: 0,
-  angle: 0
-};
-
-
-// ============================================================
-// WALLS
-// ============================================================
-
-let walls = [];
-
-
-// ============================================================
-// SETUP
-// ============================================================
+let spawnTimer = 0;
+let difficulty = 1;
 
 function setup() {
-
-  createCanvas(
-    windowWidth,
-    windowHeight,
-    WEBGL
-  );
-
-  createMaze();
-
-  noStroke();
-
+  createCanvas(900, 650);
+  angleMode(RADIANS);
+  textFont("Arial");
 }
-
-
-// ============================================================
-// CREATE MAZE
-// ============================================================
-
-function createMaze() {
-
-  const mazeWidth =
-    maze[0].length;
-
-  const mazeHeight =
-    maze.length;
-
-
-  const offsetX =
-    mazeWidth * CELL_SIZE / 2;
-
-  const offsetZ =
-    mazeHeight * CELL_SIZE / 2;
-
-
-  for (
-    let row = 0;
-    row < mazeHeight;
-    row++
-  ) {
-
-    for (
-      let col = 0;
-      col < maze[row].length;
-      col++
-    ) {
-
-      const tile =
-        maze[row][col];
-
-
-      const worldX =
-        col * CELL_SIZE
-        - offsetX
-        + CELL_SIZE / 2;
-
-
-      const worldZ =
-        row * CELL_SIZE
-        - offsetZ
-        + CELL_SIZE / 2;
-
-
-      if (tile === "#") {
-
-        walls.push({
-
-          x: worldX,
-          z: worldZ
-
-        });
-
-      }
-
-
-      if (tile === "P") {
-
-        player.x = worldX;
-        player.z = worldZ;
-
-      }
-
-    }
-
-  }
-
-}
-
-
-// ============================================================
-// DRAW
-// ============================================================
 
 function draw() {
+  background(12, 15, 14);
 
-  background(
-    35,
-    40,
-    50
-  );
-
-
-  // --------------------------
-  // Player
-  // --------------------------
-
-  updatePlayer();
-
-
-  // --------------------------
-  // Camera
-  // --------------------------
-
-  updateCamera();
-
-
-  // --------------------------
-  // Lighting
-  // --------------------------
-
-  ambientLight(
-    150
-  );
-
-
-  directionalLight(
-
-    255,
-    255,
-    255,
-
-    -0.3,
-    -1,
-    -0.5
-
-  );
-
-
-  // --------------------------
-  // World
-  // --------------------------
-
-  drawFloor();
-
-  drawWalls();
-
-}
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-function updatePlayer() {
-
-  let forward = 0;
-  let strafe = 0;
-
-
-  // ------------------------------------------------
-  // Read keyboard EVERY frame
-  // ------------------------------------------------
-
-  if (
-    keyIsDown(87) &&
-    document.activeElement !== document.body
-  ) {
-    forward += 1;
-  }
-
-  if (
-    keyIsDown(83) &&
-    document.activeElement !== document.body
-  ) {
-    forward -= 1;
-  }
-
-  if (
-    keyIsDown(65) &&
-    document.activeElement !== document.body
-  ) {
-    strafe -= 1;
-  }
-
-  if (
-    keyIsDown(68) &&
-    document.activeElement !== document.body
-  ) {
-    strafe += 1;
-  }
-
-
-  // ------------------------------------------------
-  // No movement
-  // ------------------------------------------------
-
-  if (
-    forward === 0 &&
-    strafe === 0
-  ) {
+  if (!gameStarted) {
+    drawTitle();
     return;
   }
 
-
-  // ------------------------------------------------
-  // Forward direction
-  // ------------------------------------------------
-
-  let dx =
-    sin(player.angle) *
-    forward;
-
-
-  let dz =
-    -cos(player.angle) *
-    forward;
-
-
-  // ------------------------------------------------
-  // Strafe
-  // ------------------------------------------------
-
-  dx +=
-    cos(player.angle) *
-    strafe;
-
-
-  dz +=
-    sin(player.angle) *
-    strafe;
-
-
-  // ------------------------------------------------
-  // Normalize
-  // ------------------------------------------------
-
-  const length =
-    sqrt(
-      dx * dx +
-      dz * dz
-    );
-
-
-  if (length === 0) {
+  if (gameOver) {
+    drawGameOver();
     return;
   }
-
-
-  dx /= length;
-  dz /= length;
-
-
-  // ------------------------------------------------
-  // Speed
-  // ------------------------------------------------
-
-  dx *= MOVE_SPEED;
-  dz *= MOVE_SPEED;
-
-
-  // ------------------------------------------------
-  // Collision
-  // ------------------------------------------------
-
-  moveWithCollision(
-    dx,
-    dz
-  );
-
-}
-
-
-// ============================================================
-// MOVE WITH COLLISION
-// ============================================================
-
-function moveWithCollision(
-  dx,
-  dz
-) {
-
-  const nextX =
-    player.x + dx;
-
-
-  if (
-    !isColliding(
-      nextX,
-      player.z
-    )
-  ) {
-
-    player.x = nextX;
-
-  }
-
-
-  const nextZ =
-    player.z + dz;
-
-
-  if (
-    !isColliding(
-      player.x,
-      nextZ
-    )
-  ) {
-
-    player.z = nextZ;
-
-  }
-
-}
-
-
-// ============================================================
-// COLLISION
-// ============================================================
-
-function isColliding(
-  x,
-  z
-) {
-
-  for (
-    const wall of walls
-  ) {
-
-    const closestX =
-      constrain(
-
-        x,
-
-        wall.x - CELL_SIZE / 2,
-        wall.x + CELL_SIZE / 2
-
-      );
-
-
-    const closestZ =
-      constrain(
-
-        z,
-
-        wall.z - CELL_SIZE / 2,
-        wall.z + CELL_SIZE / 2
-
-      );
-
-
-    const distance =
-      dist(
-
-        x,
-        z,
-
-        closestX,
-        closestZ
-
-      );
-
-
-    if (
-      distance < PLAYER_RADIUS
-    ) {
-
-      return true;
-
-    }
-
-  }
-
-
-  return false;
-
-}
-
-
-// ============================================================
-// CAMERA
-// ============================================================
-
-function updateCamera() {
-
-  const lookDistance = 100;
-
-
-  const lookX =
-    player.x +
-    sin(player.angle) *
-    lookDistance;
-
-
-  const lookZ =
-    player.z -
-    cos(player.angle) *
-    lookDistance;
-
-
-  camera(
-
-    player.x,
-    -PLAYER_HEIGHT,
-    player.z,
-
-    lookX,
-    -PLAYER_HEIGHT,
-    lookZ,
-
-    0,
-    1,
-    0
-
-  );
-
-}
-
-
-// ============================================================
-// FLOOR
-// ============================================================
-
-function drawFloor() {
 
   push();
 
+  // 画面揺れ
+  if (shake > 0) {
+    translate(random(-shake, shake), random(-shake, shake));
+    shake *= 0.88;
+  }
 
-  translate(
-    0,
-    20,
-    0
-  );
+  drawWorld();
 
+  updateZombies();
+  updateBullets();
+  updateParticles();
+  updateCasings();
 
-  rotateX(
-    HALF_PI
-  );
-
-
-  // Base color
-
-  ambientMaterial(
-    70,
-    75,
-    80
-  );
-
-
-  plane(
-    3000,
-    3000
-  );
-
+  drawPlayer();
+  drawCrosshair();
 
   pop();
 
+  drawHUD();
 
-  // Floor grid
+  // ゾンビ出現
+  spawnTimer--;
 
-  drawFloorGrid();
+  if (spawnTimer <= 0) {
+    spawnZombie();
+    spawnTimer = max(18, 65 - difficulty * 4);
+  }
 
+  // 時間経過で少しずつ難しくなる
+  difficulty += 0.002;
+
+  if (muzzleFlash > 0) {
+    muzzleFlash--;
+  }
+
+  // リロード
+  if (reloading) {
+    reloadTimer--;
+
+    if (reloadTimer <= 0) {
+      ammo = maxAmmo;
+      reloading = false;
+    }
+  }
 }
 
+// ==========================================
+// タイトル
+// ==========================================
 
-// ============================================================
-// FLOOR GRID
-// ============================================================
+function drawTitle() {
+  background(8, 10, 9);
 
-function drawFloorGrid() {
+  for (let i = 0; i < 20; i++) {
+    noStroke();
+    fill(80, 0, 0, 10);
 
-  push();
+    ellipse(
+      random(width),
+      random(height),
+      random(100, 400)
+    );
+  }
 
+  textAlign(CENTER, CENTER);
 
-  translate(
-    0,
-    19,
-    0
+  fill(180, 20, 20);
+  textSize(72);
+  text("ZOMBIE", width / 2, height / 2 - 80);
+
+  fill(230);
+  textSize(55);
+  text("SURVIVAL", width / 2, height / 2 - 15);
+
+  fill(170);
+  textSize(20);
+  text("CLICK TO START", width / 2, height / 2 + 70);
+
+  fill(100);
+  textSize(14);
+  text(
+    "CLICK : SHOOT    R : RELOAD",
+    width / 2,
+    height / 2 + 110
   );
 
+  textAlign(LEFT, BASELINE);
+}
 
-  rotateX(
-    HALF_PI
-  );
+// ==========================================
+// 背景
+// ==========================================
 
+function drawWorld() {
+  noStroke();
 
-  stroke(
-    110,
-    115,
-    120
-  );
+  fill(27, 30, 27);
+  rect(0, 0, width, height);
 
+  fill(34, 35, 31);
+  rect(80, 80, width - 160, height - 160);
+
+  // 床のタイル
+  stroke(45, 46, 41);
   strokeWeight(1);
 
-
-  const size = 1500;
-
-  const step = CELL_SIZE;
-
-
-  for (
-    let x = -size;
-    x <= size;
-    x += step
-  ) {
-
-    line(
-      x,
-      -size,
-      x,
-      size
-    );
-
+  for (let x = 80; x < width - 80; x += 45) {
+    line(x, 80, x, height - 80);
   }
 
-
-  for (
-    let z = -size;
-    z <= size;
-    z += step
-  ) {
-
-    line(
-      -size,
-      z,
-      size,
-      z
-    );
-
+  for (let y = 80; y < height - 80; y += 45) {
+    line(80, y, width - 80, y);
   }
 
+  // 壁
+  noStroke();
+  fill(18, 20, 19);
 
+  rect(0, 0, width, 80);
+  rect(0, height - 80, width, 80);
+  rect(0, 0, 80, height);
+  rect(width - 80, 0, 80, height);
+
+  // 霧
+  for (let i = 0; i < 10; i++) {
+    fill(150, 160, 150, 4);
+
+    ellipse(
+      random(width),
+      random(height),
+      random(100, 350),
+      random(50, 180)
+    );
+  }
+
+  // 血痕
+  for (let s of bloodSplats) {
+    noStroke();
+    fill(100, 5, 5, 150);
+
+    ellipse(
+      s.x,
+      s.y,
+      s.size,
+      s.size * 0.5
+    );
+  }
+}
+
+// ==========================================
+// プレイヤー
+// ==========================================
+
+function drawPlayer() {
+  let angle = atan2(
+    mouseY - height / 2,
+    mouseX - width / 2
+  );
+
+  push();
+
+  translate(width / 2, height / 2);
+  rotate(angle);
+
+  // 腕
+  fill(150, 105, 75);
   noStroke();
 
+  ellipse(10, -12, 70, 18);
+  ellipse(10, 12, 70, 18);
+
+  // 銃
+  fill(35);
+  rect(10, -8, 70, 16, 3);
+
+  // 銃身
+  fill(15);
+  rect(65, -4, 35, 8);
+
+  // グリップ
+  fill(45);
+  rect(25, 7, 18, 35, 4);
 
   pop();
-
 }
 
+// ==========================================
+// ゾンビ
+// ==========================================
 
-// ============================================================
-// WALLS
-// ============================================================
+function spawnZombie() {
+  let side = floor(random(4));
+  let x;
+  let y;
 
-function drawWalls() {
-
-  for (
-    const wall of walls
-  ) {
-
-    drawWall(
-      wall.x,
-      wall.z
-    );
-
+  if (side === 0) {
+    x = random(width);
+    y = -50;
+  } else if (side === 1) {
+    x = width + 50;
+    y = random(height);
+  } else if (side === 2) {
+    x = random(width);
+    y = height + 50;
+  } else {
+    x = -50;
+    y = random(height);
   }
 
+  let type = random();
+
+  zombies.push({
+    x: x,
+    y: y,
+
+    // ★ 少し小さくした
+    size: type < 0.2 ? 55 : 40,
+
+    // ★ 少し速くした
+    speed:
+      type < 0.2
+        ? random(1.0, 1.4) * difficulty
+        : random(0.7, 1.0) * difficulty,
+
+    // 大型ゾンビは3発
+    hp:
+      type < 0.2
+        ? 3
+        : 1,
+
+    maxHP:
+      type < 0.2
+        ? 3
+        : 1,
+
+    wobble: random(TWO_PI),
+    hitFlash: 0
+  });
 }
 
+function updateZombies() {
+  for (let i = zombies.length - 1; i >= 0; i--) {
+    let z = zombies[i];
 
-// ============================================================
-// SINGLE WALL
-// ============================================================
+    let dx = width / 2 - z.x;
+    let dy = height / 2 - z.y;
 
-function drawWall(
-  x,
-  z
-) {
+    let angle = atan2(dy, dx);
 
-  push();
+    // 少しふらつきながら進む
+    z.wobble += 0.04;
 
+    let wobbleX = sin(z.wobble) * 0.4;
+    let wobbleY = cos(z.wobble * 1.3) * 0.4;
 
-  translate(
-    x,
-    -30,
-    z
-  );
+    z.x += cos(angle) * z.speed + wobbleX;
+    z.y += sin(angle) * z.speed + wobbleY;
 
+    drawZombie(z);
 
-  // Base wall
+    // プレイヤーに接触
+    if (
+      dist(
+        z.x,
+        z.y,
+        width / 2,
+        height / 2
+      ) < z.size * 0.45 + 25
+    ) {
+      hp -= z.size > 50 ? 0.7 : 0.4;
 
-  ambientMaterial(
-    145,
-    155,
-    170
-  );
+      shake = 3;
 
+      if (hp <= 0) {
+        hp = 0;
+        gameOver = true;
+      }
+    }
 
-  box(
-    CELL_SIZE,
-    WALL_HEIGHT,
-    CELL_SIZE
-  );
-
-
-  pop();
-
-
-  // Brick pattern
-
-  drawBrickPattern(
-    x,
-    z
-  );
-
-}
-
-
-// ============================================================
-// BRICK PATTERN
-// ============================================================
-
-function drawBrickPattern(
-  x,
-  z
-) {
-
-  const rows = 5;
-
-  const brickHeight =
-    WALL_HEIGHT / rows;
-
-
-  for (
-    let row = 0;
-    row < rows;
-    row++
-  ) {
-
-    const y =
-      -WALL_HEIGHT / 2
-      + brickHeight / 2
-      + row * brickHeight;
-
-
-    const offset =
-      row % 2 === 0
-        ? 0
-        : CELL_SIZE / 2;
-
-
-    // Front
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z - CELL_SIZE / 2 - 0.5,
-      0,
-      offset,
-      brickHeight
-    );
-
-
-    // Back
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z + CELL_SIZE / 2 + 0.5,
-      PI,
-      offset,
-      brickHeight
-    );
-
+    if (z.hitFlash > 0) {
+      z.hitFlash--;
+    }
   }
-
 }
 
+// ==========================================
+// ゾンビ描画
+// ==========================================
 
-// ============================================================
-// BRICK FACE
-// ============================================================
-
-function drawBrickFace(
-  x,
-  y,
-  z,
-  rotation,
-  offset,
-  brickHeight
-) {
-
+function drawZombie(z) {
   push();
 
+  translate(z.x, z.y);
 
-  translate(
-    x,
-    y,
-    z
+  let angle = atan2(
+    height / 2 - z.y,
+    width / 2 - z.x
   );
 
+  rotate(angle + HALF_PI);
 
-  rotateY(
-    rotation
+  // 影
+  noStroke();
+
+  fill(0, 0, 0, 90);
+
+  ellipse(
+    0,
+    z.size * 0.42,
+    z.size * 0.9,
+    z.size * 0.25
   );
 
+  // 足
+  stroke(35, 40, 35);
+  strokeWeight(z.size * 0.16);
 
-  // Horizontal lines
-
-  stroke(
-    80,
-    85,
-    95
+  line(
+    -z.size * 0.18,
+    z.size * 0.2,
+    -z.size * 0.25,
+    z.size * 0.55
   );
 
+  line(
+    z.size * 0.18,
+    z.size * 0.2,
+    z.size * 0.25,
+    z.size * 0.55
+  );
+
+  // 腕
+  stroke(75, 85, 65);
+  strokeWeight(z.size * 0.13);
+
+  line(
+    -z.size * 0.25,
+    -z.size * 0.05,
+    -z.size * 0.55,
+    z.size * 0.12
+  );
+
+  line(
+    z.size * 0.25,
+    -z.size * 0.05,
+    z.size * 0.55,
+    z.size * 0.12
+  );
+
+  // 体
+  noStroke();
+
+  fill(
+    z.hitFlash > 0 ? 230 : 70,
+    z.hitFlash > 0 ? 40 : 80,
+    z.hitFlash > 0 ? 40 : 65
+  );
+
+  ellipse(
+    0,
+    z.size * 0.05,
+    z.size * 0.58,
+    z.size * 0.7
+  );
+
+  // 首
+  fill(80, 90, 70);
+
+  rect(
+    -z.size * 0.1,
+    -z.size * 0.35,
+    z.size * 0.2,
+    z.size * 0.18
+  );
+
+  // 頭
+  fill(
+    z.hitFlash > 0 ? 255 : 100,
+    z.hitFlash > 0 ? 50 : 110,
+    z.hitFlash > 0 ? 50 : 80
+  );
+
+  ellipse(
+    0,
+    -z.size * 0.5,
+    z.size * 0.55,
+    z.size * 0.55
+  );
+
+  // 髪
+  fill(25);
+
+  arc(
+    0,
+    -z.size * 0.58,
+    z.size * 0.5,
+    z.size * 0.35,
+    PI,
+    TWO_PI
+  );
+
+  // 目
+  fill(220, 20, 20);
+
+  ellipse(
+    -z.size * 0.12,
+    -z.size * 0.52,
+    z.size * 0.07,
+    z.size * 0.06
+  );
+
+  ellipse(
+    z.size * 0.12,
+    -z.size * 0.52,
+    z.size * 0.07,
+    z.size * 0.06
+  );
+
+  // 口
+  stroke(35);
   strokeWeight(2);
 
-
   line(
-    -CELL_SIZE / 2,
-    -brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    -brickHeight / 2,
-    0
+    -z.size * 0.12,
+    -z.size * 0.39,
+    z.size * 0.12,
+    -z.size * 0.39
   );
-
-
-  line(
-    -CELL_SIZE / 2,
-    brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    brickHeight / 2,
-    0
-  );
-
-
-  // Vertical brick lines
-
-  const brickWidth = 40;
-
-
-  for (
-    let i = -2;
-    i <= 2;
-    i++
-  ) {
-
-    const bx =
-      i * brickWidth
-      + offset % brickWidth;
-
-
-    line(
-      bx,
-      -brickHeight / 2,
-      0,
-
-      bx,
-      brickHeight / 2,
-      0
-    );
-
-  }
-
-
-  noStroke();
-
 
   pop();
 
+  // HPバー
+  if (z.hp < z.maxHP) {
+    noStroke();
+
+    fill(30);
+
+    rect(
+      z.x - 25,
+      z.y - z.size * 0.9,
+      50,
+      5
+    );
+
+    fill(210, 30, 30);
+
+    rect(
+      z.x - 25,
+      z.y - z.size * 0.9,
+      50 * (z.hp / z.maxHP),
+      5
+    );
+  }
 }
 
+// ==========================================
+// 射撃
+// ==========================================
 
-// ============================================================
-// MOUSE
-// ============================================================
-
-function mousePressed() {
-
+function shoot() {
   if (
-    document.pointerLockElement
-  ) {
-
-    return;
-
-  }
-
-
-  requestPointerLock();
-
-}
-
-
-// ============================================================
-// MOUSE LOOK
-// ============================================================
-
-function mouseMoved() {
-
-  if (
-    document.pointerLockElement
-  ) {
-
-    player.angle +=
-      movedX *
-      MOUSE_SENSITIVITY;
-
-  }
-
-}
-
-
-// ============================================================
-// KEY RESET
-// ============================================================
-
-function keyReleased() {
-
-  // Force browser to release
-  // any possible stuck key.
-
-  if (
-    key === "w" ||
-    key === "W"
+    reloading ||
+    ammo <= 0 ||
+    gameOver
   ) {
     return;
   }
 
-  if (
-    key === "a" ||
-    key === "A"
-  ) {
-    return;
-  }
+  ammo--;
 
-  if (
-    key === "s" ||
-    key === "S"
-  ) {
-    return;
-  }
-
-  if (
-    key === "d" ||
-    key === "D"
-  ) {
-    return;
-  }
-
-}
-
-
-// ============================================================
-// WINDOW BLUR
-// ============================================================
-
-window.addEventListener(
-  "blur",
-  function() {
-
-    // Nothing is stored as movement state.
-    // keyIsDown() will naturally stop
-    // once the browser releases the key.
-
-  }
-);
-
-
-// ============================================================
-// RESIZE
-// ============================================================
-
-function windowResized() {
-
-  resizeCanvas(
-    windowWidth,
-    windowHeight
+  let angle = atan2(
+    mouseY - height / 2,
+    mouseX - width / 2
   );
 
+  // 少しだけ弾が散る
+  angle += random(-0.025, 0.025);
+
+  bullets.push({
+    x: width / 2 + cos(angle) * 90,
+    y: height / 2 + sin(angle) * 90,
+
+    vx: cos(angle) * 18,
+    vy: sin(angle) * 18,
+
+    life: 70
+  });
+
+  // 発射演出
+  muzzleFlash = 4;
+
+  // 画面揺れ
+  shake = 5;
+
+  // 薬莢
+  casings.push({
+    x: width / 2,
+    y: height / 2,
+    vx: random(-3, 3),
+    vy: random(-3, 3),
+    life: 60
+  });
+
+  // 火花
+  for (let i = 0; i < 8; i++) {
+    particles.push({
+      x: width / 2 + cos(angle) * 80,
+      y: height / 2 + sin(angle) * 80,
+
+      vx: cos(angle) * random(2, 6),
+      vy: sin(angle) * random(2, 6),
+
+      life: 30,
+
+      color: [255, 180, 50]
+    });
+  }
 }
-</script>
+
+// ==========================================
+// 弾
+// ==========================================
+
+function updateBullets() {
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    let b = bullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+    b.life--;
+
+    stroke(255, 230, 120);
+    strokeWeight(3);
+
+    line(
+      b.x,
+      b.y,
+      b.x - b.vx * 1.5,
+      b.y - b.vy * 1.5
+    );
+
+    // ゾンビとの当たり判定
+    for (
+      let j = zombies.length - 1;
+      j >= 0;
+      j--
+    ) {
+      let z = zombies[j];
+
+      if (
+        dist(b.x, b.y, z.x, z.y) <
+        z.size * 0.5
+      ) {
+        z.hp--;
+
+        z.hitFlash = 5;
+
+        createBlood(
+          z.x,
+          z.y
+        );
+
+        bullets.splice(i, 1);
+
+        if (z.hp <= 0) {
+          score += z.size > 50 ? 50 : 20;
+
+          createBigBlood(
+            z.x,
+            z.y
+          );
+
+          bloodSplats.push({
+            x: z.x,
+            y: z.y,
+            size: random(30, 70)
+          });
+
+          zombies.splice(j, 1);
+        }
+
+        break;
+      }
+    }
+
+    if (
+      i < bullets.length &&
+      (
+        b.life <= 0 ||
+        b.x < -50 ||
+        b.x > width + 50 ||
+        b.y < -50 ||
+        b.y > height + 50
+      )
+    ) {
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ==========================================
+// 血のエフェクト
+// ==========================================
+
+function createBlood(x, y) {
+  for (let i = 0; i < 12; i++) {
+    particles.push({
+      x: x,
+      y: y,
+
+      vx: random(-4, 4),
+      vy: random(-4, 4),
+
+      life: random(20, 45),
+
+      color: [170, 10, 10]
+    });
+  }
+}
+
+function createBigBlood(x, y) {
+  for (let i = 0; i < 35; i++) {
+    particles.push({
+      x: x,
+      y: y,
+
+      vx: random(-7, 7),
+      vy: random(-7, 7),
+
+      life: random(30, 70),
+
+      color: [180, 5, 5]
+    });
+  }
+}
+
+// ==========================================
+// パーティクル
+// ==========================================
+
+function updateParticles() {
+  noStroke();
+
+  for (
+    let i = particles.length - 1;
+    i >= 0;
+    i--
+  ) {
+    let p = particles[i];
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+
+    p.life--;
+
+    fill(
+      p.color[0],
+      p.color[1],
+      p.color[2],
+      map(
+        p.life,
+        0,
+        70,
+        0,
+        220
+      )
+    );
+
+    circle(
+      p.x,
+      p.y,
+      random(2, 6)
+    );
+
+    if (p.life <= 0) {
+      particles.splice(i, 1);
+    }
+  }
+}
+
+// ==========================================
+// 薬莢
+// ==========================================
+
+function updateCasings() {
+  for (
+    let i = casings.length - 1;
+    i >= 0;
+    i--
+  ) {
+    let c = casings[i];
+
+    c.x += c.vx;
+    c.y += c.vy;
+
+    c.vx *= 0.97;
+    c.vy *= 0.97;
+
+    c.life--;
+
+    fill(190, 150, 50);
+    noStroke();
+
+    ellipse(
+      c.x,
+      c.y,
+      5,
+      8
+    );
+
+    if (c.life <= 0) {
+      casings.splice(i, 1);
+    }
+  }
+}
+
+// ==========================================
+// 照準
+// ==========================================
+
+function drawCrosshair() {
+  stroke(220, 220, 220, 220);
+  strokeWeight(2);
+  noFill();
+
+  circle(
+    mouseX,
+    mouseY,
+    24
+  );
+
+  line(
+    mouseX - 18,
+    mouseY,
+    mouseX - 7,
+    mouseY
+  );
+
+  line(
+    mouseX + 7,
+    mouseY,
+    mouseX + 18,
+    mouseY
+  );
+
+  line(
+    mouseX,
+    mouseY - 18,
+    mouseX,
+    mouseY - 7
+  );
+
+  line(
+    mouseX,
+    mouseY + 7,
+    mouseX,
+    mouseY + 18
+  );
+
+  // マズルフラッシュ
+  if (muzzleFlash > 0) {
+    noStroke();
+
+    fill(255, 200, 50, 150);
+
+    circle(
+      width / 2,
+      height / 2,
+      random(50, 80)
+    );
+  }
+}
+
+// ==========================================
+// HUD
+// ==========================================
+
+function drawHUD() {
+  // 画面を少し暗くする
+  noStroke();
+
+  for (let i = 0; i < 15; i++) {
+    fill(0, 0, 0, 8);
+
+    rect(
+      i * 5,
+      i * 5,
+      width - i * 10,
+      height - i * 10
+    );
+  }
+
+  // HP
+  fill(220);
+  textSize(18);
+
+  text(
+    "HEALTH",
+    25,
+    height - 65
+  );
+
+  fill(50);
+
+  rect(
+    25,
+    height - 52,
+    220,
+    18
+  );
+
+  if (hp > 50) {
+    fill(40, 180, 70);
+  } else if (hp > 25) {
+    fill(220, 170, 30);
+  } else {
+    fill(200, 30, 30);
+  }
+
+  rect(
+    25,
+    height - 52,
+    220 * (hp / 100),
+    18
+  );
+
+  // 弾数
+  textSize(35);
+
+  if (ammo <= 3) {
+    fill(220, 50, 50);
+  } else {
+    fill(230);
+  }
+
+  text(
+    ammo + " / " + maxAmmo,
+    width - 150,
+    height - 40
+  );
+
+  // スコア
+  fill(230);
+  textSize(20);
+
+  text(
+    "SCORE  " + score,
+    25,
+    35
+  );
+
+  // ゾンビ数
+  fill(150);
+  textSize(14);
+
+  text(
+    "HOSTILES: " + zombies.length,
+    25,
+    55
+  );
+
+  // リロード
+  if (reloading) {
+    textAlign(CENTER, CENTER);
+
+    fill(255);
+    textSize(25);
+
+    text(
+      "RELOADING...",
+      width / 2,
+      height - 70
+    );
+
+    textAlign(LEFT, BASELINE);
+  }
+}
+
+// ==========================================
+// ゲームオーバー
+// ==========================================
+
+function drawGameOver() {
+  background(5, 5, 5);
+
+  for (let i = 0; i < 30; i++) {
+    fill(100, 0, 0, 8);
+    noStroke();
+
+    ellipse(
+      random(width),
+      random(height),
+      random(100, 500),
+      random(100, 300)
+    );
+  }
+
+  textAlign(CENTER, CENTER);
+
+  fill(190, 25, 25);
+  textSize(65);
+
+  text(
+    "YOU DIED",
+    width / 2,
+    height / 2 - 70
+  );
+
+  fill(230);
+  textSize(28);
+
+  text(
+    "SCORE  " + score,
+    width / 2,
+    height / 2
+  );
+
+  fill(150);
+  textSize(18);
+
+  text(
+    "CLICK TO RESTART",
+    width / 2,
+    height / 2 + 55
+  );
+
+  textAlign(LEFT, BASELINE);
+}
+
+// ==========================================
+// 操作
+// ==========================================
+
+function mousePressed() {
+  if (!gameStarted) {
+    gameStarted = true;
+    return;
+  }
+
+  if (gameOver) {
+    restart();
+    return;
+  }
+
+  shoot();
+}
+
+function keyPressed() {
+  if (key === "r" || key === "R") {
+    reload();
+  }
+}
+
+function reload() {
+  if (
+    reloading ||
+    ammo === maxAmmo ||
+    gameOver
+  ) {
+    return;
+  }
+
+  reloading = true;
+
+  // リロード時間
+  reloadTimer = 10;
+}
+
+// ==========================================
+// リスタート
+// ==========================================
+
+function restart() {
+  zombies = [];
+  bullets = [];
+  particles = [];
+  casings = [];
+  bloodSplats = [];
+
+  score = 0;
+  hp = 100;
+  ammo = maxAmmo;
+
+  difficulty = 1;
+  spawnTimer = 30;
+
+  reloading = false;
+  gameOver = false;
+}</script>
 
   <div class="code-container">
     <h3>ソースコード</h3>
-    <pre><code class="language-javascript">// ============================================================
-// 3D FPS MAZE
-// p5.js
-// ============================================================
+    <pre><code class="language-javascript">// ==========================================
+// ZOMBIE SURVIVAL - p5.js
+// ==========================================
 
+let zombies = [];
+let bullets = [];
+let particles = [];
+let casings = [];
+let bloodSplats = [];
 
-// ============================================================
-// MAZE
-// ============================================================
+let score = 0;
+let hp = 100;
 
-const maze = [
-  &quot;###############&quot;,
-  &quot;#P            #&quot;,
-  &quot;# ##### ##### #&quot;,
-  &quot;#     #       #&quot;,
-  &quot;##### # #######&quot;,
-  &quot;#     #       #&quot;,
-  &quot;# ### ##### # #&quot;,
-  &quot;# #         # #&quot;,
-  &quot;# # ####### # #&quot;,
-  &quot;# #       #   #&quot;,
-  &quot;# ####### #####&quot;,
-  &quot;#             #&quot;,
-  &quot;###############&quot;
-];
+let ammo = 30;
+const maxAmmo = 30;
 
+let reloading = false;
+let reloadTimer = 0;
 
-// ============================================================
-// SETTINGS
-// ============================================================
+let shake = 0;
+let muzzleFlash = 0;
 
-const CELL_SIZE = 80;
-const WALL_HEIGHT = 120;
+let gameStarted = false;
+let gameOver = false;
 
-const PLAYER_HEIGHT = 45;
-const PLAYER_RADIUS = 18;
-
-const MOVE_SPEED = 3.5;
-
-const MOUSE_SENSITIVITY = 0.0025;
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-let player = {
-  x: 0,
-  z: 0,
-  angle: 0
-};
-
-
-// ============================================================
-// WALLS
-// ============================================================
-
-let walls = [];
-
-
-// ============================================================
-// SETUP
-// ============================================================
+let spawnTimer = 0;
+let difficulty = 1;
 
 function setup() {
-
-  createCanvas(
-    windowWidth,
-    windowHeight,
-    WEBGL
-  );
-
-  createMaze();
-
-  noStroke();
-
+  createCanvas(900, 650);
+  angleMode(RADIANS);
+  textFont(&quot;Arial&quot;);
 }
-
-
-// ============================================================
-// CREATE MAZE
-// ============================================================
-
-function createMaze() {
-
-  const mazeWidth =
-    maze[0].length;
-
-  const mazeHeight =
-    maze.length;
-
-
-  const offsetX =
-    mazeWidth * CELL_SIZE / 2;
-
-  const offsetZ =
-    mazeHeight * CELL_SIZE / 2;
-
-
-  for (
-    let row = 0;
-    row &lt; mazeHeight;
-    row++
-  ) {
-
-    for (
-      let col = 0;
-      col &lt; maze[row].length;
-      col++
-    ) {
-
-      const tile =
-        maze[row][col];
-
-
-      const worldX =
-        col * CELL_SIZE
-        - offsetX
-        + CELL_SIZE / 2;
-
-
-      const worldZ =
-        row * CELL_SIZE
-        - offsetZ
-        + CELL_SIZE / 2;
-
-
-      if (tile === &quot;#&quot;) {
-
-        walls.push({
-
-          x: worldX,
-          z: worldZ
-
-        });
-
-      }
-
-
-      if (tile === &quot;P&quot;) {
-
-        player.x = worldX;
-        player.z = worldZ;
-
-      }
-
-    }
-
-  }
-
-}
-
-
-// ============================================================
-// DRAW
-// ============================================================
 
 function draw() {
+  background(12, 15, 14);
 
-  background(
-    35,
-    40,
-    50
-  );
-
-
-  // --------------------------
-  // Player
-  // --------------------------
-
-  updatePlayer();
-
-
-  // --------------------------
-  // Camera
-  // --------------------------
-
-  updateCamera();
-
-
-  // --------------------------
-  // Lighting
-  // --------------------------
-
-  ambientLight(
-    150
-  );
-
-
-  directionalLight(
-
-    255,
-    255,
-    255,
-
-    -0.3,
-    -1,
-    -0.5
-
-  );
-
-
-  // --------------------------
-  // World
-  // --------------------------
-
-  drawFloor();
-
-  drawWalls();
-
-}
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-function updatePlayer() {
-
-  let forward = 0;
-  let strafe = 0;
-
-
-  // ------------------------------------------------
-  // Read keyboard EVERY frame
-  // ------------------------------------------------
-
-  if (
-    keyIsDown(87) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    forward += 1;
-  }
-
-  if (
-    keyIsDown(83) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    forward -= 1;
-  }
-
-  if (
-    keyIsDown(65) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    strafe -= 1;
-  }
-
-  if (
-    keyIsDown(68) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    strafe += 1;
-  }
-
-
-  // ------------------------------------------------
-  // No movement
-  // ------------------------------------------------
-
-  if (
-    forward === 0 &amp;&amp;
-    strafe === 0
-  ) {
+  if (!gameStarted) {
+    drawTitle();
     return;
   }
 
-
-  // ------------------------------------------------
-  // Forward direction
-  // ------------------------------------------------
-
-  let dx =
-    sin(player.angle) *
-    forward;
-
-
-  let dz =
-    -cos(player.angle) *
-    forward;
-
-
-  // ------------------------------------------------
-  // Strafe
-  // ------------------------------------------------
-
-  dx +=
-    cos(player.angle) *
-    strafe;
-
-
-  dz +=
-    sin(player.angle) *
-    strafe;
-
-
-  // ------------------------------------------------
-  // Normalize
-  // ------------------------------------------------
-
-  const length =
-    sqrt(
-      dx * dx +
-      dz * dz
-    );
-
-
-  if (length === 0) {
+  if (gameOver) {
+    drawGameOver();
     return;
   }
-
-
-  dx /= length;
-  dz /= length;
-
-
-  // ------------------------------------------------
-  // Speed
-  // ------------------------------------------------
-
-  dx *= MOVE_SPEED;
-  dz *= MOVE_SPEED;
-
-
-  // ------------------------------------------------
-  // Collision
-  // ------------------------------------------------
-
-  moveWithCollision(
-    dx,
-    dz
-  );
-
-}
-
-
-// ============================================================
-// MOVE WITH COLLISION
-// ============================================================
-
-function moveWithCollision(
-  dx,
-  dz
-) {
-
-  const nextX =
-    player.x + dx;
-
-
-  if (
-    !isColliding(
-      nextX,
-      player.z
-    )
-  ) {
-
-    player.x = nextX;
-
-  }
-
-
-  const nextZ =
-    player.z + dz;
-
-
-  if (
-    !isColliding(
-      player.x,
-      nextZ
-    )
-  ) {
-
-    player.z = nextZ;
-
-  }
-
-}
-
-
-// ============================================================
-// COLLISION
-// ============================================================
-
-function isColliding(
-  x,
-  z
-) {
-
-  for (
-    const wall of walls
-  ) {
-
-    const closestX =
-      constrain(
-
-        x,
-
-        wall.x - CELL_SIZE / 2,
-        wall.x + CELL_SIZE / 2
-
-      );
-
-
-    const closestZ =
-      constrain(
-
-        z,
-
-        wall.z - CELL_SIZE / 2,
-        wall.z + CELL_SIZE / 2
-
-      );
-
-
-    const distance =
-      dist(
-
-        x,
-        z,
-
-        closestX,
-        closestZ
-
-      );
-
-
-    if (
-      distance &lt; PLAYER_RADIUS
-    ) {
-
-      return true;
-
-    }
-
-  }
-
-
-  return false;
-
-}
-
-
-// ============================================================
-// CAMERA
-// ============================================================
-
-function updateCamera() {
-
-  const lookDistance = 100;
-
-
-  const lookX =
-    player.x +
-    sin(player.angle) *
-    lookDistance;
-
-
-  const lookZ =
-    player.z -
-    cos(player.angle) *
-    lookDistance;
-
-
-  camera(
-
-    player.x,
-    -PLAYER_HEIGHT,
-    player.z,
-
-    lookX,
-    -PLAYER_HEIGHT,
-    lookZ,
-
-    0,
-    1,
-    0
-
-  );
-
-}
-
-
-// ============================================================
-// FLOOR
-// ============================================================
-
-function drawFloor() {
 
   push();
 
+  // 画面揺れ
+  if (shake &gt; 0) {
+    translate(random(-shake, shake), random(-shake, shake));
+    shake *= 0.88;
+  }
 
-  translate(
-    0,
-    20,
-    0
-  );
+  drawWorld();
 
+  updateZombies();
+  updateBullets();
+  updateParticles();
+  updateCasings();
 
-  rotateX(
-    HALF_PI
-  );
-
-
-  // Base color
-
-  ambientMaterial(
-    70,
-    75,
-    80
-  );
-
-
-  plane(
-    3000,
-    3000
-  );
-
+  drawPlayer();
+  drawCrosshair();
 
   pop();
 
+  drawHUD();
 
-  // Floor grid
+  // ゾンビ出現
+  spawnTimer--;
 
-  drawFloorGrid();
+  if (spawnTimer &lt;= 0) {
+    spawnZombie();
+    spawnTimer = max(18, 65 - difficulty * 4);
+  }
 
+  // 時間経過で少しずつ難しくなる
+  difficulty += 0.002;
+
+  if (muzzleFlash &gt; 0) {
+    muzzleFlash--;
+  }
+
+  // リロード
+  if (reloading) {
+    reloadTimer--;
+
+    if (reloadTimer &lt;= 0) {
+      ammo = maxAmmo;
+      reloading = false;
+    }
+  }
 }
 
+// ==========================================
+// タイトル
+// ==========================================
 
-// ============================================================
-// FLOOR GRID
-// ============================================================
+function drawTitle() {
+  background(8, 10, 9);
 
-function drawFloorGrid() {
+  for (let i = 0; i &lt; 20; i++) {
+    noStroke();
+    fill(80, 0, 0, 10);
 
-  push();
+    ellipse(
+      random(width),
+      random(height),
+      random(100, 400)
+    );
+  }
 
+  textAlign(CENTER, CENTER);
 
-  translate(
-    0,
-    19,
-    0
+  fill(180, 20, 20);
+  textSize(72);
+  text(&quot;ZOMBIE&quot;, width / 2, height / 2 - 80);
+
+  fill(230);
+  textSize(55);
+  text(&quot;SURVIVAL&quot;, width / 2, height / 2 - 15);
+
+  fill(170);
+  textSize(20);
+  text(&quot;CLICK TO START&quot;, width / 2, height / 2 + 70);
+
+  fill(100);
+  textSize(14);
+  text(
+    &quot;CLICK : SHOOT    R : RELOAD&quot;,
+    width / 2,
+    height / 2 + 110
   );
 
+  textAlign(LEFT, BASELINE);
+}
 
-  rotateX(
-    HALF_PI
-  );
+// ==========================================
+// 背景
+// ==========================================
 
+function drawWorld() {
+  noStroke();
 
-  stroke(
-    110,
-    115,
-    120
-  );
+  fill(27, 30, 27);
+  rect(0, 0, width, height);
 
+  fill(34, 35, 31);
+  rect(80, 80, width - 160, height - 160);
+
+  // 床のタイル
+  stroke(45, 46, 41);
   strokeWeight(1);
 
-
-  const size = 1500;
-
-  const step = CELL_SIZE;
-
-
-  for (
-    let x = -size;
-    x &lt;= size;
-    x += step
-  ) {
-
-    line(
-      x,
-      -size,
-      x,
-      size
-    );
-
+  for (let x = 80; x &lt; width - 80; x += 45) {
+    line(x, 80, x, height - 80);
   }
 
-
-  for (
-    let z = -size;
-    z &lt;= size;
-    z += step
-  ) {
-
-    line(
-      -size,
-      z,
-      size,
-      z
-    );
-
+  for (let y = 80; y &lt; height - 80; y += 45) {
+    line(80, y, width - 80, y);
   }
 
+  // 壁
+  noStroke();
+  fill(18, 20, 19);
 
+  rect(0, 0, width, 80);
+  rect(0, height - 80, width, 80);
+  rect(0, 0, 80, height);
+  rect(width - 80, 0, 80, height);
+
+  // 霧
+  for (let i = 0; i &lt; 10; i++) {
+    fill(150, 160, 150, 4);
+
+    ellipse(
+      random(width),
+      random(height),
+      random(100, 350),
+      random(50, 180)
+    );
+  }
+
+  // 血痕
+  for (let s of bloodSplats) {
+    noStroke();
+    fill(100, 5, 5, 150);
+
+    ellipse(
+      s.x,
+      s.y,
+      s.size,
+      s.size * 0.5
+    );
+  }
+}
+
+// ==========================================
+// プレイヤー
+// ==========================================
+
+function drawPlayer() {
+  let angle = atan2(
+    mouseY - height / 2,
+    mouseX - width / 2
+  );
+
+  push();
+
+  translate(width / 2, height / 2);
+  rotate(angle);
+
+  // 腕
+  fill(150, 105, 75);
   noStroke();
 
+  ellipse(10, -12, 70, 18);
+  ellipse(10, 12, 70, 18);
+
+  // 銃
+  fill(35);
+  rect(10, -8, 70, 16, 3);
+
+  // 銃身
+  fill(15);
+  rect(65, -4, 35, 8);
+
+  // グリップ
+  fill(45);
+  rect(25, 7, 18, 35, 4);
 
   pop();
-
 }
 
+// ==========================================
+// ゾンビ
+// ==========================================
 
-// ============================================================
-// WALLS
-// ============================================================
+function spawnZombie() {
+  let side = floor(random(4));
+  let x;
+  let y;
 
-function drawWalls() {
-
-  for (
-    const wall of walls
-  ) {
-
-    drawWall(
-      wall.x,
-      wall.z
-    );
-
+  if (side === 0) {
+    x = random(width);
+    y = -50;
+  } else if (side === 1) {
+    x = width + 50;
+    y = random(height);
+  } else if (side === 2) {
+    x = random(width);
+    y = height + 50;
+  } else {
+    x = -50;
+    y = random(height);
   }
 
+  let type = random();
+
+  zombies.push({
+    x: x,
+    y: y,
+
+    // ★ 少し小さくした
+    size: type &lt; 0.2 ? 55 : 40,
+
+    // ★ 少し速くした
+    speed:
+      type &lt; 0.2
+        ? random(1.0, 1.4) * difficulty
+        : random(0.7, 1.0) * difficulty,
+
+    // 大型ゾンビは3発
+    hp:
+      type &lt; 0.2
+        ? 3
+        : 1,
+
+    maxHP:
+      type &lt; 0.2
+        ? 3
+        : 1,
+
+    wobble: random(TWO_PI),
+    hitFlash: 0
+  });
 }
 
+function updateZombies() {
+  for (let i = zombies.length - 1; i &gt;= 0; i--) {
+    let z = zombies[i];
 
-// ============================================================
-// SINGLE WALL
-// ============================================================
+    let dx = width / 2 - z.x;
+    let dy = height / 2 - z.y;
 
-function drawWall(
-  x,
-  z
-) {
+    let angle = atan2(dy, dx);
 
-  push();
+    // 少しふらつきながら進む
+    z.wobble += 0.04;
 
+    let wobbleX = sin(z.wobble) * 0.4;
+    let wobbleY = cos(z.wobble * 1.3) * 0.4;
 
-  translate(
-    x,
-    -30,
-    z
-  );
+    z.x += cos(angle) * z.speed + wobbleX;
+    z.y += sin(angle) * z.speed + wobbleY;
 
+    drawZombie(z);
 
-  // Base wall
+    // プレイヤーに接触
+    if (
+      dist(
+        z.x,
+        z.y,
+        width / 2,
+        height / 2
+      ) &lt; z.size * 0.45 + 25
+    ) {
+      hp -= z.size &gt; 50 ? 0.7 : 0.4;
 
-  ambientMaterial(
-    145,
-    155,
-    170
-  );
+      shake = 3;
 
+      if (hp &lt;= 0) {
+        hp = 0;
+        gameOver = true;
+      }
+    }
 
-  box(
-    CELL_SIZE,
-    WALL_HEIGHT,
-    CELL_SIZE
-  );
-
-
-  pop();
-
-
-  // Brick pattern
-
-  drawBrickPattern(
-    x,
-    z
-  );
-
-}
-
-
-// ============================================================
-// BRICK PATTERN
-// ============================================================
-
-function drawBrickPattern(
-  x,
-  z
-) {
-
-  const rows = 5;
-
-  const brickHeight =
-    WALL_HEIGHT / rows;
-
-
-  for (
-    let row = 0;
-    row &lt; rows;
-    row++
-  ) {
-
-    const y =
-      -WALL_HEIGHT / 2
-      + brickHeight / 2
-      + row * brickHeight;
-
-
-    const offset =
-      row % 2 === 0
-        ? 0
-        : CELL_SIZE / 2;
-
-
-    // Front
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z - CELL_SIZE / 2 - 0.5,
-      0,
-      offset,
-      brickHeight
-    );
-
-
-    // Back
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z + CELL_SIZE / 2 + 0.5,
-      PI,
-      offset,
-      brickHeight
-    );
-
+    if (z.hitFlash &gt; 0) {
+      z.hitFlash--;
+    }
   }
-
 }
 
+// ==========================================
+// ゾンビ描画
+// ==========================================
 
-// ============================================================
-// BRICK FACE
-// ============================================================
-
-function drawBrickFace(
-  x,
-  y,
-  z,
-  rotation,
-  offset,
-  brickHeight
-) {
-
+function drawZombie(z) {
   push();
 
+  translate(z.x, z.y);
 
-  translate(
-    x,
-    y,
-    z
+  let angle = atan2(
+    height / 2 - z.y,
+    width / 2 - z.x
   );
 
+  rotate(angle + HALF_PI);
 
-  rotateY(
-    rotation
+  // 影
+  noStroke();
+
+  fill(0, 0, 0, 90);
+
+  ellipse(
+    0,
+    z.size * 0.42,
+    z.size * 0.9,
+    z.size * 0.25
   );
 
+  // 足
+  stroke(35, 40, 35);
+  strokeWeight(z.size * 0.16);
 
-  // Horizontal lines
-
-  stroke(
-    80,
-    85,
-    95
+  line(
+    -z.size * 0.18,
+    z.size * 0.2,
+    -z.size * 0.25,
+    z.size * 0.55
   );
 
+  line(
+    z.size * 0.18,
+    z.size * 0.2,
+    z.size * 0.25,
+    z.size * 0.55
+  );
+
+  // 腕
+  stroke(75, 85, 65);
+  strokeWeight(z.size * 0.13);
+
+  line(
+    -z.size * 0.25,
+    -z.size * 0.05,
+    -z.size * 0.55,
+    z.size * 0.12
+  );
+
+  line(
+    z.size * 0.25,
+    -z.size * 0.05,
+    z.size * 0.55,
+    z.size * 0.12
+  );
+
+  // 体
+  noStroke();
+
+  fill(
+    z.hitFlash &gt; 0 ? 230 : 70,
+    z.hitFlash &gt; 0 ? 40 : 80,
+    z.hitFlash &gt; 0 ? 40 : 65
+  );
+
+  ellipse(
+    0,
+    z.size * 0.05,
+    z.size * 0.58,
+    z.size * 0.7
+  );
+
+  // 首
+  fill(80, 90, 70);
+
+  rect(
+    -z.size * 0.1,
+    -z.size * 0.35,
+    z.size * 0.2,
+    z.size * 0.18
+  );
+
+  // 頭
+  fill(
+    z.hitFlash &gt; 0 ? 255 : 100,
+    z.hitFlash &gt; 0 ? 50 : 110,
+    z.hitFlash &gt; 0 ? 50 : 80
+  );
+
+  ellipse(
+    0,
+    -z.size * 0.5,
+    z.size * 0.55,
+    z.size * 0.55
+  );
+
+  // 髪
+  fill(25);
+
+  arc(
+    0,
+    -z.size * 0.58,
+    z.size * 0.5,
+    z.size * 0.35,
+    PI,
+    TWO_PI
+  );
+
+  // 目
+  fill(220, 20, 20);
+
+  ellipse(
+    -z.size * 0.12,
+    -z.size * 0.52,
+    z.size * 0.07,
+    z.size * 0.06
+  );
+
+  ellipse(
+    z.size * 0.12,
+    -z.size * 0.52,
+    z.size * 0.07,
+    z.size * 0.06
+  );
+
+  // 口
+  stroke(35);
   strokeWeight(2);
 
-
   line(
-    -CELL_SIZE / 2,
-    -brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    -brickHeight / 2,
-    0
+    -z.size * 0.12,
+    -z.size * 0.39,
+    z.size * 0.12,
+    -z.size * 0.39
   );
-
-
-  line(
-    -CELL_SIZE / 2,
-    brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    brickHeight / 2,
-    0
-  );
-
-
-  // Vertical brick lines
-
-  const brickWidth = 40;
-
-
-  for (
-    let i = -2;
-    i &lt;= 2;
-    i++
-  ) {
-
-    const bx =
-      i * brickWidth
-      + offset % brickWidth;
-
-
-    line(
-      bx,
-      -brickHeight / 2,
-      0,
-
-      bx,
-      brickHeight / 2,
-      0
-    );
-
-  }
-
-
-  noStroke();
-
 
   pop();
 
+  // HPバー
+  if (z.hp &lt; z.maxHP) {
+    noStroke();
+
+    fill(30);
+
+    rect(
+      z.x - 25,
+      z.y - z.size * 0.9,
+      50,
+      5
+    );
+
+    fill(210, 30, 30);
+
+    rect(
+      z.x - 25,
+      z.y - z.size * 0.9,
+      50 * (z.hp / z.maxHP),
+      5
+    );
+  }
 }
 
+// ==========================================
+// 射撃
+// ==========================================
 
-// ============================================================
-// MOUSE
-// ============================================================
-
-function mousePressed() {
-
+function shoot() {
   if (
-    document.pointerLockElement
-  ) {
-
-    return;
-
-  }
-
-
-  requestPointerLock();
-
-}
-
-
-// ============================================================
-// MOUSE LOOK
-// ============================================================
-
-function mouseMoved() {
-
-  if (
-    document.pointerLockElement
-  ) {
-
-    player.angle +=
-      movedX *
-      MOUSE_SENSITIVITY;
-
-  }
-
-}
-
-
-// ============================================================
-// KEY RESET
-// ============================================================
-
-function keyReleased() {
-
-  // Force browser to release
-  // any possible stuck key.
-
-  if (
-    key === &quot;w&quot; ||
-    key === &quot;W&quot;
+    reloading ||
+    ammo &lt;= 0 ||
+    gameOver
   ) {
     return;
   }
 
-  if (
-    key === &quot;a&quot; ||
-    key === &quot;A&quot;
-  ) {
-    return;
-  }
+  ammo--;
 
-  if (
-    key === &quot;s&quot; ||
-    key === &quot;S&quot;
-  ) {
-    return;
-  }
-
-  if (
-    key === &quot;d&quot; ||
-    key === &quot;D&quot;
-  ) {
-    return;
-  }
-
-}
-
-
-// ============================================================
-// WINDOW BLUR
-// ============================================================
-
-window.addEventListener(
-  &quot;blur&quot;,
-  function() {
-
-    // Nothing is stored as movement state.
-    // keyIsDown() will naturally stop
-    // once the browser releases the key.
-
-  }
-);
-
-
-// ============================================================
-// RESIZE
-// ============================================================
-
-function windowResized() {
-
-  resizeCanvas(
-    windowWidth,
-    windowHeight
+  let angle = atan2(
+    mouseY - height / 2,
+    mouseX - width / 2
   );
 
+  // 少しだけ弾が散る
+  angle += random(-0.025, 0.025);
+
+  bullets.push({
+    x: width / 2 + cos(angle) * 90,
+    y: height / 2 + sin(angle) * 90,
+
+    vx: cos(angle) * 18,
+    vy: sin(angle) * 18,
+
+    life: 70
+  });
+
+  // 発射演出
+  muzzleFlash = 4;
+
+  // 画面揺れ
+  shake = 5;
+
+  // 薬莢
+  casings.push({
+    x: width / 2,
+    y: height / 2,
+    vx: random(-3, 3),
+    vy: random(-3, 3),
+    life: 60
+  });
+
+  // 火花
+  for (let i = 0; i &lt; 8; i++) {
+    particles.push({
+      x: width / 2 + cos(angle) * 80,
+      y: height / 2 + sin(angle) * 80,
+
+      vx: cos(angle) * random(2, 6),
+      vy: sin(angle) * random(2, 6),
+
+      life: 30,
+
+      color: [255, 180, 50]
+    });
+  }
 }
-</code></pre>
+
+// ==========================================
+// 弾
+// ==========================================
+
+function updateBullets() {
+  for (let i = bullets.length - 1; i &gt;= 0; i--) {
+    let b = bullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+    b.life--;
+
+    stroke(255, 230, 120);
+    strokeWeight(3);
+
+    line(
+      b.x,
+      b.y,
+      b.x - b.vx * 1.5,
+      b.y - b.vy * 1.5
+    );
+
+    // ゾンビとの当たり判定
+    for (
+      let j = zombies.length - 1;
+      j &gt;= 0;
+      j--
+    ) {
+      let z = zombies[j];
+
+      if (
+        dist(b.x, b.y, z.x, z.y) &lt;
+        z.size * 0.5
+      ) {
+        z.hp--;
+
+        z.hitFlash = 5;
+
+        createBlood(
+          z.x,
+          z.y
+        );
+
+        bullets.splice(i, 1);
+
+        if (z.hp &lt;= 0) {
+          score += z.size &gt; 50 ? 50 : 20;
+
+          createBigBlood(
+            z.x,
+            z.y
+          );
+
+          bloodSplats.push({
+            x: z.x,
+            y: z.y,
+            size: random(30, 70)
+          });
+
+          zombies.splice(j, 1);
+        }
+
+        break;
+      }
+    }
+
+    if (
+      i &lt; bullets.length &amp;&amp;
+      (
+        b.life &lt;= 0 ||
+        b.x &lt; -50 ||
+        b.x &gt; width + 50 ||
+        b.y &lt; -50 ||
+        b.y &gt; height + 50
+      )
+    ) {
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ==========================================
+// 血のエフェクト
+// ==========================================
+
+function createBlood(x, y) {
+  for (let i = 0; i &lt; 12; i++) {
+    particles.push({
+      x: x,
+      y: y,
+
+      vx: random(-4, 4),
+      vy: random(-4, 4),
+
+      life: random(20, 45),
+
+      color: [170, 10, 10]
+    });
+  }
+}
+
+function createBigBlood(x, y) {
+  for (let i = 0; i &lt; 35; i++) {
+    particles.push({
+      x: x,
+      y: y,
+
+      vx: random(-7, 7),
+      vy: random(-7, 7),
+
+      life: random(30, 70),
+
+      color: [180, 5, 5]
+    });
+  }
+}
+
+// ==========================================
+// パーティクル
+// ==========================================
+
+function updateParticles() {
+  noStroke();
+
+  for (
+    let i = particles.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+    let p = particles[i];
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    p.vx *= 0.96;
+    p.vy *= 0.96;
+
+    p.life--;
+
+    fill(
+      p.color[0],
+      p.color[1],
+      p.color[2],
+      map(
+        p.life,
+        0,
+        70,
+        0,
+        220
+      )
+    );
+
+    circle(
+      p.x,
+      p.y,
+      random(2, 6)
+    );
+
+    if (p.life &lt;= 0) {
+      particles.splice(i, 1);
+    }
+  }
+}
+
+// ==========================================
+// 薬莢
+// ==========================================
+
+function updateCasings() {
+  for (
+    let i = casings.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+    let c = casings[i];
+
+    c.x += c.vx;
+    c.y += c.vy;
+
+    c.vx *= 0.97;
+    c.vy *= 0.97;
+
+    c.life--;
+
+    fill(190, 150, 50);
+    noStroke();
+
+    ellipse(
+      c.x,
+      c.y,
+      5,
+      8
+    );
+
+    if (c.life &lt;= 0) {
+      casings.splice(i, 1);
+    }
+  }
+}
+
+// ==========================================
+// 照準
+// ==========================================
+
+function drawCrosshair() {
+  stroke(220, 220, 220, 220);
+  strokeWeight(2);
+  noFill();
+
+  circle(
+    mouseX,
+    mouseY,
+    24
+  );
+
+  line(
+    mouseX - 18,
+    mouseY,
+    mouseX - 7,
+    mouseY
+  );
+
+  line(
+    mouseX + 7,
+    mouseY,
+    mouseX + 18,
+    mouseY
+  );
+
+  line(
+    mouseX,
+    mouseY - 18,
+    mouseX,
+    mouseY - 7
+  );
+
+  line(
+    mouseX,
+    mouseY + 7,
+    mouseX,
+    mouseY + 18
+  );
+
+  // マズルフラッシュ
+  if (muzzleFlash &gt; 0) {
+    noStroke();
+
+    fill(255, 200, 50, 150);
+
+    circle(
+      width / 2,
+      height / 2,
+      random(50, 80)
+    );
+  }
+}
+
+// ==========================================
+// HUD
+// ==========================================
+
+function drawHUD() {
+  // 画面を少し暗くする
+  noStroke();
+
+  for (let i = 0; i &lt; 15; i++) {
+    fill(0, 0, 0, 8);
+
+    rect(
+      i * 5,
+      i * 5,
+      width - i * 10,
+      height - i * 10
+    );
+  }
+
+  // HP
+  fill(220);
+  textSize(18);
+
+  text(
+    &quot;HEALTH&quot;,
+    25,
+    height - 65
+  );
+
+  fill(50);
+
+  rect(
+    25,
+    height - 52,
+    220,
+    18
+  );
+
+  if (hp &gt; 50) {
+    fill(40, 180, 70);
+  } else if (hp &gt; 25) {
+    fill(220, 170, 30);
+  } else {
+    fill(200, 30, 30);
+  }
+
+  rect(
+    25,
+    height - 52,
+    220 * (hp / 100),
+    18
+  );
+
+  // 弾数
+  textSize(35);
+
+  if (ammo &lt;= 3) {
+    fill(220, 50, 50);
+  } else {
+    fill(230);
+  }
+
+  text(
+    ammo + &quot; / &quot; + maxAmmo,
+    width - 150,
+    height - 40
+  );
+
+  // スコア
+  fill(230);
+  textSize(20);
+
+  text(
+    &quot;SCORE  &quot; + score,
+    25,
+    35
+  );
+
+  // ゾンビ数
+  fill(150);
+  textSize(14);
+
+  text(
+    &quot;HOSTILES: &quot; + zombies.length,
+    25,
+    55
+  );
+
+  // リロード
+  if (reloading) {
+    textAlign(CENTER, CENTER);
+
+    fill(255);
+    textSize(25);
+
+    text(
+      &quot;RELOADING...&quot;,
+      width / 2,
+      height - 70
+    );
+
+    textAlign(LEFT, BASELINE);
+  }
+}
+
+// ==========================================
+// ゲームオーバー
+// ==========================================
+
+function drawGameOver() {
+  background(5, 5, 5);
+
+  for (let i = 0; i &lt; 30; i++) {
+    fill(100, 0, 0, 8);
+    noStroke();
+
+    ellipse(
+      random(width),
+      random(height),
+      random(100, 500),
+      random(100, 300)
+    );
+  }
+
+  textAlign(CENTER, CENTER);
+
+  fill(190, 25, 25);
+  textSize(65);
+
+  text(
+    &quot;YOU DIED&quot;,
+    width / 2,
+    height / 2 - 70
+  );
+
+  fill(230);
+  textSize(28);
+
+  text(
+    &quot;SCORE  &quot; + score,
+    width / 2,
+    height / 2
+  );
+
+  fill(150);
+  textSize(18);
+
+  text(
+    &quot;CLICK TO RESTART&quot;,
+    width / 2,
+    height / 2 + 55
+  );
+
+  textAlign(LEFT, BASELINE);
+}
+
+// ==========================================
+// 操作
+// ==========================================
+
+function mousePressed() {
+  if (!gameStarted) {
+    gameStarted = true;
+    return;
+  }
+
+  if (gameOver) {
+    restart();
+    return;
+  }
+
+  shoot();
+}
+
+function keyPressed() {
+  if (key === &quot;r&quot; || key === &quot;R&quot;) {
+    reload();
+  }
+}
+
+function reload() {
+  if (
+    reloading ||
+    ammo === maxAmmo ||
+    gameOver
+  ) {
+    return;
+  }
+
+  reloading = true;
+
+  // リロード時間
+  reloadTimer = 10;
+}
+
+// ==========================================
+// リスタート
+// ==========================================
+
+function restart() {
+  zombies = [];
+  bullets = [];
+  particles = [];
+  casings = [];
+  bloodSplats = [];
+
+  score = 0;
+  hp = 100;
+  ammo = maxAmmo;
+
+  difficulty = 1;
+  spawnTimer = 30;
+
+  reloading = false;
+  gameOver = false;
+}</code></pre>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
