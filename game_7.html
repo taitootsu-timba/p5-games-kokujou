@@ -6,15 +6,92 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
-    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
-    h1 { font-size: 1.2rem; margin-bottom: 5px; }
-    p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
-    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
-    .back-link:hover { text-decoration: underline; }
-    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
-    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+    p {
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    #game-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    #game-container canvas {
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 4px;
+    }
+    .code-container {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      text-align: left;
+      background: #272822;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #1e1e1e;
+      margin: 0;
+      padding: 8px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-header span {
+      font-size: 0.85rem;
+      color: #888;
+      font-weight: bold;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .copy-btn:hover {
+      background: #333;
+      border-color: #666;
+      color: #fff;
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    pre {
+      margin: 0 !important;
+      padding: 15px !important;
+      font-size: 0.85rem;
+      max-height: 500px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -22,858 +99,20 @@
   <h1>作者: 首藤</h1>
   <p>ターン制コマンドバトル</p>
   
-  <script>/* ===================== 基本設定 ===================== */
-const W = 960, H = 600;
-const BASE_AV = 10000;
+  <!-- ゲーム画面を配置する領域 -->
+  <div id="game-container"></div>
 
-let gameState = 'title'; // 'title' | 'battle' | 'end'
-let battleOutcome = null; // 'win' | 'lose'
-
-let party = [];
-let boss = null;
-let allUnits = [];
-let currentActor = null;
-let upcomingQueue = [];
-let phase = 'idle'; // idle, playerInput, enemyWait, resolve
-let phaseTimer = 0;
-
-let popups = [];
-let smokeParticles = [];
-let stars = [];
-let hitFlashBoss = 0;
-let hitFlashAlly = {};
-
-/* SP: パーティ共有のスキルポイント */
-const MAX_SP = 5;
-let sp = 3;
-
-/* ボタン矩形（味方表示と重ならないよう右下にまとめて配置） */
-const cmdPanel = {x:700, y:440, w:250, h:160};
-const btnNormal = {x:788, y:460, w:150, h:52};
-const btnSkill  = {x:788, y:520, w:150, h:52};
-const spPipArea = {x:716, y:468, gap:24, r:9};
-let btnRetry = {x: W/2-140, y: 470, w:260, h:46};
-let btnExit  = {x: W/2-140, y: 526, w:260, h:46};
-
-/* ===================== セットアップ ===================== */
-function setup(){
-  const c = createCanvas(W, H);
-  c.parent('gameHolder');
-  textFont('Hiragino Sans, Yu Gothic, sans-serif');
-  for(let i=0;i<120;i++){
-    stars.push({x:random(W), y:random(H*0.7), r:random(0.6,2.2), tw:random(1000)});
-  }
-  createUnits();
-}
-
-const PARTY_Y = 375;
-const PARTY_XS = [100, 270, 440, 610];
-const ALLY_MAX_HP = 5000;
-const BOSS_MAX_HP = 10000000;
-const BOSS_INITIAL_LIVES = 2;
-
-let lastBossDamage = null; // {text, big} 直近に敵へ与えたダメージ表示（次のダメージで上書き）
-
-function createUnits(){
-  party = [
-    {id:'p0', name:'アリア', hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:112, isAlly:true, alive:true, color:[255,130,170], x:PARTY_XS[0], y:PARTY_Y, ep:0},
-    {id:'p1', name:'レン',   hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:96,  isAlly:true, alive:true, color:[120,180,255], x:PARTY_XS[1], y:PARTY_Y, ep:0},
-    {id:'p2', name:'ミナト', hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:128, isAlly:true, alive:true, color:[255,205,110], x:PARTY_XS[2], y:PARTY_Y, ep:0},
-    {id:'p3', name:'ユキ',   hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:84,  isAlly:true, alive:true, color:[150,255,190], x:PARTY_XS[3], y:PARTY_Y, ep:0},
-  ];
-  boss = {id:'boss', name:'ヴォルガレス', hp:BOSS_MAX_HP, maxHp:BOSS_MAX_HP, lives:BOSS_INITIAL_LIVES, speed:100, isAlly:false, alive:true, color:[210,90,230], x:480, y:225};
-  allUnits = [...party, boss];
-  allUnits.forEach(u=>{ u.av = BASE_AV/u.speed; });
-  hitFlashAlly = {}; party.forEach(p=>hitFlashAlly[p.id]=0);
-  hitFlashBoss = 0;
-  popups = [];
-  lastBossDamage = null;
-  sp = 3;
-}
-
-function resetBattle(){
-  createUnits();
-  battleOutcome = null;
-  gameState = 'battle';
-  nextTurn();
-}
-
-function fmt(n){ return Math.round(n).toLocaleString('ja-JP'); }
-
-/* ===================== 行動順(AV/ゲージ)ロジック ===================== */
-function pickNext(units){
-  const alive = units.filter(u=>u.alive);
-  return alive.reduce((a,b)=> a.av < b.av ? a : b);
-}
-function advanceAV(u){ u.av += BASE_AV / u.speed; }
-
-function computeUpcoming(units, currentId, count){
-  const clones = units.map(u=>({...u}));
-  const cur = clones.find(u=>u.id===currentId);
-  if(cur) advanceAV(cur);
-  const list = [];
-  for(let i=0;i<count;i++){
-    const alive = clones.filter(u=>u.alive);
-    if(alive.length===0) break;
-    const nxt = alive.reduce((a,b)=> a.av < b.av ? a : b);
-    list.push({name:nxt.name, isAlly:nxt.isAlly});
-    advanceAV(nxt);
-  }
-  return list;
-}
-
-function nextTurn(){
-  currentActor = pickNext(allUnits);
-  upcomingQueue = computeUpcoming(allUnits, currentActor.id, 5);
-  if(currentActor.isAlly){
-    phase = 'playerInput';
-  } else {
-    phase = 'enemyWait';
-    phaseTimer = millis() + 900;
-  }
-}
-
-function addPopup(x,y,text,color,big){
-  popups.push({x,y,text,color,alpha:255,big:!!big});
-}
-
-function playerAttack(type){
-  if(phase !== 'playerInput' || gameState !== 'battle') return;
-  if(type==='skill' && sp<=0) return; // SPが無ければスキル不可
-
-  const isHealer = (currentActor.id === 'p3'); // 一番右の味方はスキルで回復役
-
-  if(type==='skill' && isHealer){
-    // --- 回復スキル：味方全体のHPを500〜750回復 ---
-    sp = max(0, sp - 1);
-    currentActor.ep = min(100, currentActor.ep + 28);
-    const healAmt = floor(random(500, 751));
-    for(const p of party){
-      if(!p.alive) continue;
-      p.hp = min(p.maxHp, p.hp + healAmt);
-      addPopup(p.x, p.y-80, '+'+fmt(healAmt), [140,255,150], false);
-    }
-  } else {
-    let dmg;
-    if(type==='normal'){
-      dmg = 1000000 + floor(random(-250000, 250001));
-      if(sp < MAX_SP) sp += 1; // SPが5未満のときのみ回復
-      currentActor.ep = min(100, currentActor.ep + 18);
-    } else {
-      dmg = 1000000 + floor(random(-250000, 250001));
-      sp = max(0, sp - 1); // スキル使用でSPを1消費
-      currentActor.ep = min(100, currentActor.ep + 28);
-    }
-    dmg = max(0, dmg);
-    damageBoss(dmg);
-    hitFlashBoss = 255;
-    addPopup(boss.x, boss.y-70, '-'+fmt(dmg), type==='skill'?[255,221,120]:[255,255,255], type==='skill');
-    lastBossDamage = { text:'-'+fmt(dmg), skill:(type==='skill') };
-  }
-
-  advanceAV(currentActor);
-  phase = 'resolve';
-  phaseTimer = millis() + 650;
-}
-
-function damageBoss(dmg){
-  boss.hp = boss.hp - dmg;
-  if(boss.hp <= 0){
-    if(boss.lives > 1){
-      boss.lives -= 1;
-      boss.hp = boss.maxHp; // 残機が残っていればHP全回復して続行
-    } else {
-      boss.lives = 0;
-      boss.hp = 0;
-      boss.alive = false;
-    }
-  }
-}
-
-function enemyAttack(){
-  const aliveAllies = party.filter(p=>p.alive);
-  if(aliveAllies.length===0){ phase='resolve'; phaseTimer=millis()+200; return; }
-  const target = random(aliveAllies);
-  const dmg = max(0, 1000 + floor(random(-500, 501)));
-  target.hp = max(0, target.hp - dmg);
-  if(target.hp<=0) target.alive = false;
-  target.ep = min(100, target.ep + 10);
-  hitFlashAlly[target.id] = 255;
-  addPopup(target.x, target.y-80, '-'+fmt(dmg), [255,90,90], false);
-  advanceAV(currentActor);
-  phase = 'resolve';
-  phaseTimer = millis() + 650;
-}
-
-function checkBattleEnd(){
-  if(!boss.alive || boss.hp<=0){
-    battleOutcome = 'win';
-    gameState = 'end';
-    return true;
-  }
-  if(party.every(p=>!p.alive)){
-    battleOutcome = 'lose';
-    gameState = 'end';
-    return true;
-  }
-  return false;
-}
-
-/* ===================== メインループ ===================== */
-function draw(){
-  if(gameState === 'title'){
-    drawTitle();
-  } else if(gameState === 'battle'){
-    drawBattle();
-    if(phase==='enemyWait' && millis()>=phaseTimer){
-      enemyAttack();
-    } else if(phase==='resolve' && millis()>=phaseTimer){
-      const ended = checkBattleEnd();
-      if(!ended) nextTurn();
-    }
-  } else if(gameState === 'end'){
-    drawBattle(true);
-    drawEndOverlay();
-  }
-}
-
-/* ===================== タイトル画面 ===================== */
-function drawTitle(){
-  drawSkyBackground();
-  drawStars();
-
-  push();
-  translate(0, 30);
-  drawTrainCarriage(210, 385, 1.0);
-  drawTrainCarriage(400, 380, 1.0);
-  drawLocomotive(650, 355);
-  pop();
-
-  updateSmoke();
-  drawSmoke();
-
-  push();
-  textAlign(CENTER, CENTER);
-  fill(232,200,116);
-  stroke(20,10,30);
-  strokeWeight(4);
-  textSize(46);
-  textStyle(BOLD);
-  text('星 導 戦 記', W/2, 110);
-  noStroke();
-  fill(230,210,255,180);
-  textSize(14);
-  textStyle(NORMAL);
-  text('- Astral Rail Chronicles -', W/2, 150);
-  pop();
-
-  const a = 150 + 105*sin(frameCount*0.05);
-  push();
-  textAlign(CENTER, CENTER);
-  fill(255,255,255,a);
-  textSize(16);
-  text('クリックして始める', W/2, 555);
-  noFill();
-  stroke(232,200,116,a*0.6);
-  strokeWeight(1.5);
-  rectMode(CENTER);
-  rect(W/2, 555, 190, 34, 17);
-  pop();
-}
-
-function drawSkyBackground(){
-  for(let y=0;y<H;y++){
-    const t = y/H;
-    const r = lerp(10, 30, t);
-    const g = lerp(6, 16, t);
-    const b = lerp(22, 45, t);
-    stroke(r,g,b);
-    line(0,y,W,y);
-  }
-}
-function drawStars(){
-  noStroke();
-  for(const s of stars){
-    const tw = 0.5 + 0.5*sin(frameCount*0.03 + s.tw);
-    fill(255,255,255, 120+120*tw);
-    circle(s.x, s.y, s.r);
-  }
-}
-
-function drawTrainCarriage(cx, cy, scl){
-  push();
-  translate(cx, cy);
-  scale(scl);
-  noStroke();
-  fill(20,15,35,120);
-  ellipse(0, 58, 210, 20);
-
-  fill(70,40,90);
-  rectMode(CENTER);
-  rect(0, 10, 200, 70, 10);
-  fill(90,55,115);
-  rect(0, -18, 200, 26, 6);
-
-  fill(150,200,255,180);
-  for(let i=-70;i<=70;i+=45){
-    rect(i, 5, 26, 30, 4);
-  }
-  stroke(230,200,140); strokeWeight(2); noFill();
-  rect(0, 10, 200, 70, 10);
-
-  noStroke(); fill(30,25,40);
-  circle(-70, 48, 34); circle(70, 48, 34);
-  fill(200,180,120);
-  circle(-70,48,10); circle(70,48,10);
-  pop();
-}
-
-function drawLocomotive(cx, cy){
-  push();
-  translate(cx, cy);
-  rotate(radians(-7));
-
-  noStroke();
-  fill(15,10,25,120);
-  ellipse(-10, 70, 230, 22);
-
-  // cab (rear)
-  fill(60,35,80);
-  rectMode(CENTER);
-  rect(-95, -10, 90, 90, 8);
-  fill(90,60,120);
-  rect(-95, -45, 70, 28, 6);
-
-  // boiler (main body)
-  fill(80,50,105);
-  rect(20, 15, 160, 60, 20);
-  fill(230,200,140,60);
-  rect(20, -2, 150, 8, 4);
-
-  // gold trim rings
-  stroke(232,200,116); strokeWeight(3); noFill();
-  rect(20, 15, 160, 60, 20);
-  line(-20,-14,-20,44);
-  line(40,-14,40,44);
-  line(90,-14,90,44);
-
-  // chimney
-  noStroke();
-  fill(40,25,55);
-  rect(65, -50, 22, 40, 4);
-  fill(55,35,75);
-  ellipse(65,-70,32,14);
-
-  // front cowcatcher (angled up-right)
-  fill(70,45,95);
-  beginShape();
-  vertex(95, 40);
-  vertex(150, 40);
-  vertex(165, 5);
-  vertex(120, 20);
-  endShape(CLOSE);
-
-  // headlamp
-  fill(255,230,150);
-  circle(112,-2,16);
-  fill(255,255,220,120);
-  circle(112,-2,26);
-
-  // wheels
-  fill(25,20,35);
-  circle(-70, 60, 46);
-  circle(-10, 60, 40);
-  circle(55, 60, 40);
-  fill(210,180,120);
-  circle(-70,60,12);
-  circle(-10,60,10);
-  circle(55,60,10);
-  stroke(210,180,120); strokeWeight(2);
-  line(-70-18,60,-70+18,60);
-  line(-70,60-18,-70,60+18);
-
-  pop();
-}
-
-function updateSmoke(){
-  if(frameCount % 8 === 0){
-    smokeParticles.push({x: 650+65*cos(radians(-7))-40*sin(radians(-7)), y: 355-70+30, r: random(8,14), alpha:160, vy:random(0.6,1.1), vx:random(-0.3,0.3)});
-  }
-  for(const s of smokeParticles){
-    s.y -= s.vy;
-    s.x += s.vx + 0.15;
-    s.r += 0.25;
-    s.alpha -= 1.6;
-  }
-  smokeParticles = smokeParticles.filter(s=>s.alpha>0);
-}
-function drawSmoke(){
-  noStroke();
-  for(const s of smokeParticles){
-    fill(210,210,220,s.alpha*0.5);
-    circle(s.x, s.y, s.r);
-  }
-}
-
-/* ===================== バトル画面 ===================== */
-function drawBattle(dim){
-  drawBattleBackground();
-
-  // ---- ボス ----
-  push();
-  textAlign(CENTER, CENTER);
-  fill(230,150,255);
-  stroke(20,5,30); strokeWeight(3);
-  textSize(20);
-  text(boss.name, W/2, 42);
-  pop();
-  drawHPBar(W/2 - 165, 58, 330, 20, boss.hp/boss.maxHp, [230,90,235], true);
-  drawBossLives(W/2 - 165, 58);
-
-  drawBossFigure(boss.x, boss.y, hitFlashBoss>0);
-  if(hitFlashBoss>0) hitFlashBoss -= 12;
-
-  // ---- 味方 ----
-  for(const p of party){
-    drawAllyFigure(p, currentActor && currentActor.id===p.id && phase==='playerInput');
-    push();
-    textAlign(CENTER, CENTER);
-    fill(p.alive ? 255 : 130);
-    stroke(20,10,20); strokeWeight(2.5);
-    textSize(15);
-    text(p.name, p.x, p.y+68);
-    pop();
-    drawHPBar(p.x-60, p.y+83, 120, 13, p.alive ? p.hp/p.maxHp : 0, [90,220,140], false);
-    drawEPGauge(p.x+52, p.y-5, 16, p.ep/100);
-    if(hitFlashAlly[p.id]>0) hitFlashAlly[p.id] -= 12;
-  }
-
-  drawTurnOrderPanel();
-  drawCommandPanel();
-  drawBossDamagePanel();
-  updatePopups();
-  drawPopups();
-
-  if(dim){
-    noStroke();
-    fill(5,2,10,150);
-    rect(0,0,W,H);
-  }
-}
-
-function drawBattleBackground(){
-  for(let y=0;y<H;y++){
-    const t = y/H;
-    const r = lerp(18,8,t), g = lerp(10,6,t), b = lerp(34,18,t);
-    stroke(r,g,b);
-    line(0,y,W,y);
-  }
-  noStroke();
-  fill(120,80,180,25);
-  ellipse(W/2, 235, 420, 140);
-  fill(80,60,140,35);
-  ellipse(W/2, 470, 760, 90);
-}
-
-function drawBossFigure(x,y,flash){
-  push();
-  translate(x,y);
-  const bob = sin(frameCount*0.04)*6;
-  translate(0,bob);
-  noStroke();
-  fill(180,90,220,50);
-  ellipse(0,90,190,30);
-
-  const c = flash ? [255,255,255] : boss.color;
-  fill(c[0],c[1],c[2]);
-  beginShape();
-  for(let i=0;i<10;i++){
-    const ang = TWO_PI*i/10;
-    const rad = (i%2===0)? 78 : 55;
-    vertex(rad*cos(ang), rad*sin(ang)*0.85);
-  }
-  endShape(CLOSE);
-
-  fill(255,255,255,220);
-  ellipse(-20,-8,18,12);
-  ellipse(20,-8,18,12);
-  fill(20,5,30);
-  ellipse(-20,-8,7,9);
-  ellipse(20,-8,7,9);
-
-  stroke(255,200,255,80); strokeWeight(2); noFill();
-  ellipse(0,0,150,120);
-  pop();
-}
-
-function drawAllyFigure(p, highlight){
-  push();
-  translate(p.x, p.y);
-  if(!p.alive){
-    tint(120);
-    rotate(radians(80));
-    translate(0,20);
-  }
-  const bob = p.alive ? sin(frameCount*0.05 + p.x)*4 : 0;
-  translate(0,bob);
-
-  if(highlight){
-    noStroke();
-    fill(255,225,140,60+40*sin(frameCount*0.15));
-    ellipse(0,20,110,110);
-  }
-
-  noStroke();
-  fill(0,0,0,80);
-  ellipse(0,58,70,16);
-
-  const col = (hitFlashAlly[p.id]>0) ? [255,255,255] : p.color;
-  const alpha = p.alive ? 255 : 160;
-
-  // cape/body
-  fill(col[0],col[1],col[2],alpha);
-  beginShape();
-  vertex(-20,50); vertex(20,50); vertex(15,-10); vertex(-15,-10);
-  endShape(CLOSE);
-
-  // head
-  fill(255,225,205,alpha);
-  circle(0,-30,34);
-  // hair
-  fill(col[0]*0.6, col[1]*0.6, col[2]*0.6, alpha);
-  arc(0,-38,36,30,PI,TWO_PI);
-  // eyes
-  fill(30,20,20,alpha);
-  circle(-6,-30,3.5);
-  circle(6,-30,3.5);
-
-  // weapon accent
-  stroke(255,255,255,alpha*0.7); strokeWeight(2.5);
-  line(20,-5,32,42);
-
-  pop();
-  noTint();
-}
-
-function drawBossLives(barX, barY){
-  push();
-  noStroke();
-  for(let i=0;i<boss.lives;i++){
-    fill(255,60,60);
-    stroke(255,180,180);
-    strokeWeight(1);
-    circle(barX + 7 + i*16, barY - 8, 10);
-  }
-  pop();
-}
-
-function drawBossDamagePanel(){
-  // 画面右端やや上、他のUIと重ならない位置に最新ダメージのみ表示
-  const px = W - 20, py = 260;
-  push();
-  if(lastBossDamage){
-    rectMode(CENTER);
-    fill(10,8,18,180);
-    stroke(255,221,120,150);
-    strokeWeight(1.5);
-    rect(px-70, py, 140, 56, 8);
-
-    noStroke();
-    fill(200,190,220);
-    textAlign(CENTER,CENTER);
-    textSize(11);
-    text('与えたダメージ', px-70, py-16);
-
-    fill(lastBossDamage.skill ? color(255,221,120) : color(255,255,255));
-    textSize(20);
-    text(lastBossDamage.text, px-70, py+8);
-  }
-  pop();
-}
-
-function drawHPBar(x,y,w,h,ratio,frontColor,showPercent){
-  ratio = constrain(ratio,0,1);
-  push();
-  rectMode(CORNER);
-  noStroke();
-  fill(20,15,25,220);
-  rect(x,y,w,h,h/2);
-
-  let col;
-  if(ratio > 0.5) col = lerpColor(color(255,205,90), color(frontColor[0],frontColor[1],frontColor[2]), (ratio-0.5)*2);
-  else col = lerpColor(color(220,60,60), color(255,205,90), ratio*2);
-
-  fill(col);
-  if(ratio>0.02) rect(x,y,w*ratio,h,h/2);
-
-  noFill();
-  stroke(232,200,116,200);
-  strokeWeight(1.5);
-  rect(x,y,w,h,h/2);
-
-  if(showPercent){
-    noStroke();
-    fill(255);
-    textAlign(CENTER,CENTER);
-    textSize(12);
-    text(floor(ratio*100)+' %', x+w/2, y+h/2+1);
-  }
-  pop();
-}
-
-function drawEPGauge(x,y,r,ratio){
-  ratio = constrain(ratio,0,1);
-  push();
-  noStroke();
-  fill(15,12,22,230);
-  circle(x,y,r*2);
-
-  drawingContext.save();
-  drawingContext.beginPath();
-  drawingContext.arc(x,y,r-1.5,0,Math.PI*2);
-  drawingContext.clip();
-  const fillH = (r*2) * ratio;
-  noStroke();
-  fill(120,205,255);
-  rectMode(CORNER);
-  rect(x-r, y+r-fillH, r*2, fillH+2);
-  drawingContext.restore();
-
-  noFill();
-  stroke(180,220,255,220);
-  strokeWeight(2);
-  circle(x,y,r*2);
-
-  noStroke();
-  fill(255);
-  textAlign(CENTER,CENTER);
-  textSize(9);
-  text(floor(ratio*100), x, y+1);
-
-  fill(180,220,255,200);
-  textSize(8);
-  text('EP', x, y-r-7);
-  pop();
-}
-
-function drawTurnOrderPanel(){
-  push();
-  rectMode(CORNER);
-  fill(10,8,18,190);
-  stroke(232,200,116,180);
-  strokeWeight(1.5);
-  rect(16,16,225,205,10);
-
-  noStroke();
-  fill(232,200,116);
-  textAlign(LEFT,TOP);
-  textSize(13);
-  text('◆ 行動順', 30, 26);
-
-  if(currentActor){
-    fill(255,240,190);
-    textSize(15);
-    text('現在: ' + currentActor.name, 30, 50);
-    stroke(currentActor.isAlly ? color(120,190,255) : color(255,120,140));
-    strokeWeight(2);
-    line(30, 72, 225, 72);
-    noStroke();
-  }
-
-  textSize(12);
-  for(let i=0;i<upcomingQueue.length;i++){
-    const u = upcomingQueue[i];
-    fill(u.isAlly ? color(150,200,255) : color(255,140,150));
-    text((i+1)+'.  '+u.name, 30, 84 + i*22);
-  }
-  pop();
-}
-
-function drawCommandPanel(){
-  push();
-  rectMode(CORNER);
-  fill(10,8,18,190);
-  stroke(232,200,116,180);
-  strokeWeight(1.5);
-  rect(cmdPanel.x, cmdPanel.y, cmdPanel.w, cmdPanel.h, 10);
-
-  // --- SP表示（コマンドの左側） ---
-  noStroke();
-  fill(232,200,116);
-  textAlign(CENTER,CENTER);
-  textSize(12);
-  text('SP', spPipArea.x, cmdPanel.y + 14);
-  for(let i=0;i<MAX_SP;i++){
-    const px = spPipArea.x;
-    const py = spPipArea.y + i*spPipArea.gap;
-    if(i < sp){
-      fill(255,221,120);
-      stroke(255,240,190);
-    } else {
-      fill(40,35,50);
-      stroke(110,100,90);
-    }
-    strokeWeight(1.5);
-    circle(px, py, spPipArea.r*2);
-  }
-  noStroke();
-  fill(230,210,255,200);
-  textSize(11);
-  text(sp+' / '+MAX_SP, spPipArea.x, spPipArea.y + MAX_SP*spPipArea.gap + 4);
-
-  const active = (phase==='playerInput');
-  const skillUsable = active && sp > 0;
-  const skillLabel = (currentActor && currentActor.id==='p3') ? '回復' : 'スキル';
-  drawButton(btnNormal, '通常攻撃', active, [120,190,255]);
-  drawButton(btnSkill, skillLabel, skillUsable, [255,205,110]);
-  if(active && sp<=0){
-    noStroke();
-    fill(255,140,140,220);
-    textAlign(CENTER,CENTER);
-    textSize(10);
-    text('SP不足', btnSkill.x+btnSkill.w/2, btnSkill.y+btnSkill.h+12);
-  }
-
-  if(!active){
-    noStroke();
-    fill(200,200,210,180);
-    textAlign(CENTER,CENTER);
-    textSize(11);
-    text(currentActor ? (currentActor.name+' の行動中…') : '', cmdPanel.x+cmdPanel.w/2+30, cmdPanel.y+cmdPanel.h-12);
-  }
-  pop();
-}
-
-function drawButton(b, label, active, accent){
-  push();
-  rectMode(CORNER);
-  if(active){
-    fill(accent[0],accent[1],accent[2],60+30*sin(frameCount*0.1));
-    stroke(accent[0],accent[1],accent[2]);
-  } else {
-    fill(40,38,50,150);
-    stroke(90,90,100);
-  }
-  strokeWeight(2);
-  rect(b.x,b.y,b.w,b.h,8);
-  noStroke();
-  fill(active?255:150);
-  textAlign(CENTER,CENTER);
-  textSize(17);
-  text(label, b.x+b.w/2, b.y+b.h/2+1);
-  pop();
-}
-
-function updatePopups(){
-  for(const p of popups){
-    p.y -= 0.7;
-    p.alpha -= 4.5;
-  }
-  popups = popups.filter(p=>p.alpha>0);
-}
-function drawPopups(){
-  push();
-  textAlign(CENTER,CENTER);
-  for(const p of popups){
-    textSize(p.big?28:20);
-    stroke(0,0,0,p.alpha);
-    strokeWeight(3);
-    fill(p.color[0],p.color[1],p.color[2],p.alpha);
-    text(p.text, p.x, p.y);
-  }
-  pop();
-}
-
-/* ===================== 戦闘終了画面 ===================== */
-function drawSunMandala(x,y,size){
-  push();
-  translate(x,y);
-  rotate(frameCount*0.003);
-  noFill();
-  for(let r= size*0.4; r<size; r+=size*0.15){
-    stroke(232,200,116, 40);
-    strokeWeight(1.5);
-    circle(0,0,r*2);
-  }
-  const rays = 28;
-  for(let i=0;i<rays;i++){
-    const ang = TWO_PI*i/rays;
-    push();
-    rotate(ang);
-    const len = size*(0.55 + 0.15*sin(frameCount*0.02+i));
-    stroke(232,200,116, 90);
-    strokeWeight(3);
-    line(size*0.35,0,len,0);
-    pop();
-  }
-  noStroke();
-  fill(232,200,116,25);
-  circle(0,0,size*0.9);
-  pop();
-}
-
-function drawEndOverlay(){
-  drawSunMandala(W/2, 110, 260);
-
-  push();
-  textAlign(CENTER,CENTER);
-  stroke(15,8,5); strokeWeight(6);
-  fill(255,240,200);
-  textSize(50);
-  textStyle(BOLD);
-  text('戦 闘 終 了', W/2, 110);
-
-  noStroke();
-  fill(battleOutcome==='win' ? color(255,221,120) : color(255,120,120));
-  textSize(18);
-  textStyle(NORMAL);
-  text(battleOutcome==='win' ? '勝利' : '敗北', W/2, 155);
-  pop();
-
-  drawEndButton(btnRetry, '再挑戦する', [120,220,160]);
-  drawEndButton(btnExit, '退出する', [220,120,120]);
-}
-
-function drawEndButton(b,label,accent){
-  push();
-  rectMode(CORNER);
-  fill(20,16,28,230);
-  stroke(accent[0],accent[1],accent[2]);
-  strokeWeight(2.5);
-  rect(b.x,b.y,b.w,b.h,10);
-  noStroke();
-  fill(240,235,225);
-  textAlign(CENTER,CENTER);
-  textSize(19);
-  text(label, b.x+b.w/2, b.y+b.h/2+1);
-  pop();
-}
-
-/* ===================== 入力処理 ===================== */
-function inRect(mx,my,r){
-  return mx>=r.x && mx<=r.x+r.w && my>=r.y && my<=r.y+r.h;
-}
-
-function mousePressed(){
-  if(gameState==='title'){
-    resetBattle();
-    return;
-  }
-  if(gameState==='battle' && phase==='playerInput'){
-    if(inRect(mouseX,mouseY,btnNormal)) playerAttack('normal');
-    else if(inRect(mouseX,mouseY,btnSkill)) playerAttack('skill');
-    return;
-  }
-  if(gameState==='end'){
-    if(inRect(mouseX,mouseY,btnRetry)) resetBattle();
-    else if(inRect(mouseX,mouseY,btnExit)) gameState='title';
-    return;
-  }
-}</script>
-
+  <!-- ソースコード表示領域（ゲーム画面の下） -->
   <div class="code-container">
-    <h3>ソースコード</h3>
-    <pre><code class="language-javascript">/* ===================== 基本設定 ===================== */
+    <div class="code-header">
+      <span>ソースコード</span>
+      <button class="copy-btn" id="copy-btn" title="コードをコピー" aria-label="コードをコピー">
+        <svg id="copy-icon" viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+    </div>
+    <pre><code id="source-code" class="language-javascript">/* ===================== 基本設定 ===================== */
 const W = 960, H = 600;
 const BASE_AV = 10000;
 
@@ -1726,5 +965,889 @@ function mousePressed(){
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+  <script>
+    // コピー機能の実装
+    const copyBtn = document.getElementById("copy-btn");
+    const copyIcon = document.getElementById("copy-icon");
+    const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+    const checkSvg = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+
+    copyBtn.addEventListener("click", function() {
+      const codeText = document.getElementById("source-code").textContent;
+      navigator.clipboard.writeText(codeText).then(function() {
+        copyIcon.innerHTML = checkSvg;
+        copyBtn.style.color = "#4fc3f7";
+        setTimeout(function() {
+          copyIcon.innerHTML = originalSvg;
+          copyBtn.style.color = "";
+        }, 2000);
+      });
+    });
+
+    // 生成されたキャンバスを #game-container の中に格納する
+    function ensureCanvasInContainer() {
+      const container = document.getElementById("game-container");
+      const canvas = document.querySelector("canvas");
+      if (canvas && canvas.parentElement !== container) {
+        container.appendChild(canvas);
+      }
+    }
+    const canvasObserver = new MutationObserver(function() {
+      ensureCanvasInContainer();
+    });
+    canvasObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("load", ensureCanvasInContainer);
+  </script>
+
+  <!-- 生徒のゲームスクリプト -->
+  <script>/* ===================== 基本設定 ===================== */
+const W = 960, H = 600;
+const BASE_AV = 10000;
+
+let gameState = 'title'; // 'title' | 'battle' | 'end'
+let battleOutcome = null; // 'win' | 'lose'
+
+let party = [];
+let boss = null;
+let allUnits = [];
+let currentActor = null;
+let upcomingQueue = [];
+let phase = 'idle'; // idle, playerInput, enemyWait, resolve
+let phaseTimer = 0;
+
+let popups = [];
+let smokeParticles = [];
+let stars = [];
+let hitFlashBoss = 0;
+let hitFlashAlly = {};
+
+/* SP: パーティ共有のスキルポイント */
+const MAX_SP = 5;
+let sp = 3;
+
+/* ボタン矩形（味方表示と重ならないよう右下にまとめて配置） */
+const cmdPanel = {x:700, y:440, w:250, h:160};
+const btnNormal = {x:788, y:460, w:150, h:52};
+const btnSkill  = {x:788, y:520, w:150, h:52};
+const spPipArea = {x:716, y:468, gap:24, r:9};
+let btnRetry = {x: W/2-140, y: 470, w:260, h:46};
+let btnExit  = {x: W/2-140, y: 526, w:260, h:46};
+
+/* ===================== セットアップ ===================== */
+function setup(){
+  const c = createCanvas(W, H);
+  c.parent('gameHolder');
+  textFont('Hiragino Sans, Yu Gothic, sans-serif');
+  for(let i=0;i<120;i++){
+    stars.push({x:random(W), y:random(H*0.7), r:random(0.6,2.2), tw:random(1000)});
+  }
+  createUnits();
+}
+
+const PARTY_Y = 375;
+const PARTY_XS = [100, 270, 440, 610];
+const ALLY_MAX_HP = 5000;
+const BOSS_MAX_HP = 10000000;
+const BOSS_INITIAL_LIVES = 2;
+
+let lastBossDamage = null; // {text, big} 直近に敵へ与えたダメージ表示（次のダメージで上書き）
+
+function createUnits(){
+  party = [
+    {id:'p0', name:'アリア', hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:112, isAlly:true, alive:true, color:[255,130,170], x:PARTY_XS[0], y:PARTY_Y, ep:0},
+    {id:'p1', name:'レン',   hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:96,  isAlly:true, alive:true, color:[120,180,255], x:PARTY_XS[1], y:PARTY_Y, ep:0},
+    {id:'p2', name:'ミナト', hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:128, isAlly:true, alive:true, color:[255,205,110], x:PARTY_XS[2], y:PARTY_Y, ep:0},
+    {id:'p3', name:'ユキ',   hp:ALLY_MAX_HP, maxHp:ALLY_MAX_HP, speed:84,  isAlly:true, alive:true, color:[150,255,190], x:PARTY_XS[3], y:PARTY_Y, ep:0},
+  ];
+  boss = {id:'boss', name:'ヴォルガレス', hp:BOSS_MAX_HP, maxHp:BOSS_MAX_HP, lives:BOSS_INITIAL_LIVES, speed:100, isAlly:false, alive:true, color:[210,90,230], x:480, y:225};
+  allUnits = [...party, boss];
+  allUnits.forEach(u=>{ u.av = BASE_AV/u.speed; });
+  hitFlashAlly = {}; party.forEach(p=>hitFlashAlly[p.id]=0);
+  hitFlashBoss = 0;
+  popups = [];
+  lastBossDamage = null;
+  sp = 3;
+}
+
+function resetBattle(){
+  createUnits();
+  battleOutcome = null;
+  gameState = 'battle';
+  nextTurn();
+}
+
+function fmt(n){ return Math.round(n).toLocaleString('ja-JP'); }
+
+/* ===================== 行動順(AV/ゲージ)ロジック ===================== */
+function pickNext(units){
+  const alive = units.filter(u=>u.alive);
+  return alive.reduce((a,b)=> a.av < b.av ? a : b);
+}
+function advanceAV(u){ u.av += BASE_AV / u.speed; }
+
+function computeUpcoming(units, currentId, count){
+  const clones = units.map(u=>({...u}));
+  const cur = clones.find(u=>u.id===currentId);
+  if(cur) advanceAV(cur);
+  const list = [];
+  for(let i=0;i<count;i++){
+    const alive = clones.filter(u=>u.alive);
+    if(alive.length===0) break;
+    const nxt = alive.reduce((a,b)=> a.av < b.av ? a : b);
+    list.push({name:nxt.name, isAlly:nxt.isAlly});
+    advanceAV(nxt);
+  }
+  return list;
+}
+
+function nextTurn(){
+  currentActor = pickNext(allUnits);
+  upcomingQueue = computeUpcoming(allUnits, currentActor.id, 5);
+  if(currentActor.isAlly){
+    phase = 'playerInput';
+  } else {
+    phase = 'enemyWait';
+    phaseTimer = millis() + 900;
+  }
+}
+
+function addPopup(x,y,text,color,big){
+  popups.push({x,y,text,color,alpha:255,big:!!big});
+}
+
+function playerAttack(type){
+  if(phase !== 'playerInput' || gameState !== 'battle') return;
+  if(type==='skill' && sp<=0) return; // SPが無ければスキル不可
+
+  const isHealer = (currentActor.id === 'p3'); // 一番右の味方はスキルで回復役
+
+  if(type==='skill' && isHealer){
+    // --- 回復スキル：味方全体のHPを500〜750回復 ---
+    sp = max(0, sp - 1);
+    currentActor.ep = min(100, currentActor.ep + 28);
+    const healAmt = floor(random(500, 751));
+    for(const p of party){
+      if(!p.alive) continue;
+      p.hp = min(p.maxHp, p.hp + healAmt);
+      addPopup(p.x, p.y-80, '+'+fmt(healAmt), [140,255,150], false);
+    }
+  } else {
+    let dmg;
+    if(type==='normal'){
+      dmg = 1000000 + floor(random(-250000, 250001));
+      if(sp < MAX_SP) sp += 1; // SPが5未満のときのみ回復
+      currentActor.ep = min(100, currentActor.ep + 18);
+    } else {
+      dmg = 1000000 + floor(random(-250000, 250001));
+      sp = max(0, sp - 1); // スキル使用でSPを1消費
+      currentActor.ep = min(100, currentActor.ep + 28);
+    }
+    dmg = max(0, dmg);
+    damageBoss(dmg);
+    hitFlashBoss = 255;
+    addPopup(boss.x, boss.y-70, '-'+fmt(dmg), type==='skill'?[255,221,120]:[255,255,255], type==='skill');
+    lastBossDamage = { text:'-'+fmt(dmg), skill:(type==='skill') };
+  }
+
+  advanceAV(currentActor);
+  phase = 'resolve';
+  phaseTimer = millis() + 650;
+}
+
+function damageBoss(dmg){
+  boss.hp = boss.hp - dmg;
+  if(boss.hp <= 0){
+    if(boss.lives > 1){
+      boss.lives -= 1;
+      boss.hp = boss.maxHp; // 残機が残っていればHP全回復して続行
+    } else {
+      boss.lives = 0;
+      boss.hp = 0;
+      boss.alive = false;
+    }
+  }
+}
+
+function enemyAttack(){
+  const aliveAllies = party.filter(p=>p.alive);
+  if(aliveAllies.length===0){ phase='resolve'; phaseTimer=millis()+200; return; }
+  const target = random(aliveAllies);
+  const dmg = max(0, 1000 + floor(random(-500, 501)));
+  target.hp = max(0, target.hp - dmg);
+  if(target.hp<=0) target.alive = false;
+  target.ep = min(100, target.ep + 10);
+  hitFlashAlly[target.id] = 255;
+  addPopup(target.x, target.y-80, '-'+fmt(dmg), [255,90,90], false);
+  advanceAV(currentActor);
+  phase = 'resolve';
+  phaseTimer = millis() + 650;
+}
+
+function checkBattleEnd(){
+  if(!boss.alive || boss.hp<=0){
+    battleOutcome = 'win';
+    gameState = 'end';
+    return true;
+  }
+  if(party.every(p=>!p.alive)){
+    battleOutcome = 'lose';
+    gameState = 'end';
+    return true;
+  }
+  return false;
+}
+
+/* ===================== メインループ ===================== */
+function draw(){
+  if(gameState === 'title'){
+    drawTitle();
+  } else if(gameState === 'battle'){
+    drawBattle();
+    if(phase==='enemyWait' && millis()>=phaseTimer){
+      enemyAttack();
+    } else if(phase==='resolve' && millis()>=phaseTimer){
+      const ended = checkBattleEnd();
+      if(!ended) nextTurn();
+    }
+  } else if(gameState === 'end'){
+    drawBattle(true);
+    drawEndOverlay();
+  }
+}
+
+/* ===================== タイトル画面 ===================== */
+function drawTitle(){
+  drawSkyBackground();
+  drawStars();
+
+  push();
+  translate(0, 30);
+  drawTrainCarriage(210, 385, 1.0);
+  drawTrainCarriage(400, 380, 1.0);
+  drawLocomotive(650, 355);
+  pop();
+
+  updateSmoke();
+  drawSmoke();
+
+  push();
+  textAlign(CENTER, CENTER);
+  fill(232,200,116);
+  stroke(20,10,30);
+  strokeWeight(4);
+  textSize(46);
+  textStyle(BOLD);
+  text('星 導 戦 記', W/2, 110);
+  noStroke();
+  fill(230,210,255,180);
+  textSize(14);
+  textStyle(NORMAL);
+  text('- Astral Rail Chronicles -', W/2, 150);
+  pop();
+
+  const a = 150 + 105*sin(frameCount*0.05);
+  push();
+  textAlign(CENTER, CENTER);
+  fill(255,255,255,a);
+  textSize(16);
+  text('クリックして始める', W/2, 555);
+  noFill();
+  stroke(232,200,116,a*0.6);
+  strokeWeight(1.5);
+  rectMode(CENTER);
+  rect(W/2, 555, 190, 34, 17);
+  pop();
+}
+
+function drawSkyBackground(){
+  for(let y=0;y<H;y++){
+    const t = y/H;
+    const r = lerp(10, 30, t);
+    const g = lerp(6, 16, t);
+    const b = lerp(22, 45, t);
+    stroke(r,g,b);
+    line(0,y,W,y);
+  }
+}
+function drawStars(){
+  noStroke();
+  for(const s of stars){
+    const tw = 0.5 + 0.5*sin(frameCount*0.03 + s.tw);
+    fill(255,255,255, 120+120*tw);
+    circle(s.x, s.y, s.r);
+  }
+}
+
+function drawTrainCarriage(cx, cy, scl){
+  push();
+  translate(cx, cy);
+  scale(scl);
+  noStroke();
+  fill(20,15,35,120);
+  ellipse(0, 58, 210, 20);
+
+  fill(70,40,90);
+  rectMode(CENTER);
+  rect(0, 10, 200, 70, 10);
+  fill(90,55,115);
+  rect(0, -18, 200, 26, 6);
+
+  fill(150,200,255,180);
+  for(let i=-70;i<=70;i+=45){
+    rect(i, 5, 26, 30, 4);
+  }
+  stroke(230,200,140); strokeWeight(2); noFill();
+  rect(0, 10, 200, 70, 10);
+
+  noStroke(); fill(30,25,40);
+  circle(-70, 48, 34); circle(70, 48, 34);
+  fill(200,180,120);
+  circle(-70,48,10); circle(70,48,10);
+  pop();
+}
+
+function drawLocomotive(cx, cy){
+  push();
+  translate(cx, cy);
+  rotate(radians(-7));
+
+  noStroke();
+  fill(15,10,25,120);
+  ellipse(-10, 70, 230, 22);
+
+  // cab (rear)
+  fill(60,35,80);
+  rectMode(CENTER);
+  rect(-95, -10, 90, 90, 8);
+  fill(90,60,120);
+  rect(-95, -45, 70, 28, 6);
+
+  // boiler (main body)
+  fill(80,50,105);
+  rect(20, 15, 160, 60, 20);
+  fill(230,200,140,60);
+  rect(20, -2, 150, 8, 4);
+
+  // gold trim rings
+  stroke(232,200,116); strokeWeight(3); noFill();
+  rect(20, 15, 160, 60, 20);
+  line(-20,-14,-20,44);
+  line(40,-14,40,44);
+  line(90,-14,90,44);
+
+  // chimney
+  noStroke();
+  fill(40,25,55);
+  rect(65, -50, 22, 40, 4);
+  fill(55,35,75);
+  ellipse(65,-70,32,14);
+
+  // front cowcatcher (angled up-right)
+  fill(70,45,95);
+  beginShape();
+  vertex(95, 40);
+  vertex(150, 40);
+  vertex(165, 5);
+  vertex(120, 20);
+  endShape(CLOSE);
+
+  // headlamp
+  fill(255,230,150);
+  circle(112,-2,16);
+  fill(255,255,220,120);
+  circle(112,-2,26);
+
+  // wheels
+  fill(25,20,35);
+  circle(-70, 60, 46);
+  circle(-10, 60, 40);
+  circle(55, 60, 40);
+  fill(210,180,120);
+  circle(-70,60,12);
+  circle(-10,60,10);
+  circle(55,60,10);
+  stroke(210,180,120); strokeWeight(2);
+  line(-70-18,60,-70+18,60);
+  line(-70,60-18,-70,60+18);
+
+  pop();
+}
+
+function updateSmoke(){
+  if(frameCount % 8 === 0){
+    smokeParticles.push({x: 650+65*cos(radians(-7))-40*sin(radians(-7)), y: 355-70+30, r: random(8,14), alpha:160, vy:random(0.6,1.1), vx:random(-0.3,0.3)});
+  }
+  for(const s of smokeParticles){
+    s.y -= s.vy;
+    s.x += s.vx + 0.15;
+    s.r += 0.25;
+    s.alpha -= 1.6;
+  }
+  smokeParticles = smokeParticles.filter(s=>s.alpha>0);
+}
+function drawSmoke(){
+  noStroke();
+  for(const s of smokeParticles){
+    fill(210,210,220,s.alpha*0.5);
+    circle(s.x, s.y, s.r);
+  }
+}
+
+/* ===================== バトル画面 ===================== */
+function drawBattle(dim){
+  drawBattleBackground();
+
+  // ---- ボス ----
+  push();
+  textAlign(CENTER, CENTER);
+  fill(230,150,255);
+  stroke(20,5,30); strokeWeight(3);
+  textSize(20);
+  text(boss.name, W/2, 42);
+  pop();
+  drawHPBar(W/2 - 165, 58, 330, 20, boss.hp/boss.maxHp, [230,90,235], true);
+  drawBossLives(W/2 - 165, 58);
+
+  drawBossFigure(boss.x, boss.y, hitFlashBoss>0);
+  if(hitFlashBoss>0) hitFlashBoss -= 12;
+
+  // ---- 味方 ----
+  for(const p of party){
+    drawAllyFigure(p, currentActor && currentActor.id===p.id && phase==='playerInput');
+    push();
+    textAlign(CENTER, CENTER);
+    fill(p.alive ? 255 : 130);
+    stroke(20,10,20); strokeWeight(2.5);
+    textSize(15);
+    text(p.name, p.x, p.y+68);
+    pop();
+    drawHPBar(p.x-60, p.y+83, 120, 13, p.alive ? p.hp/p.maxHp : 0, [90,220,140], false);
+    drawEPGauge(p.x+52, p.y-5, 16, p.ep/100);
+    if(hitFlashAlly[p.id]>0) hitFlashAlly[p.id] -= 12;
+  }
+
+  drawTurnOrderPanel();
+  drawCommandPanel();
+  drawBossDamagePanel();
+  updatePopups();
+  drawPopups();
+
+  if(dim){
+    noStroke();
+    fill(5,2,10,150);
+    rect(0,0,W,H);
+  }
+}
+
+function drawBattleBackground(){
+  for(let y=0;y<H;y++){
+    const t = y/H;
+    const r = lerp(18,8,t), g = lerp(10,6,t), b = lerp(34,18,t);
+    stroke(r,g,b);
+    line(0,y,W,y);
+  }
+  noStroke();
+  fill(120,80,180,25);
+  ellipse(W/2, 235, 420, 140);
+  fill(80,60,140,35);
+  ellipse(W/2, 470, 760, 90);
+}
+
+function drawBossFigure(x,y,flash){
+  push();
+  translate(x,y);
+  const bob = sin(frameCount*0.04)*6;
+  translate(0,bob);
+  noStroke();
+  fill(180,90,220,50);
+  ellipse(0,90,190,30);
+
+  const c = flash ? [255,255,255] : boss.color;
+  fill(c[0],c[1],c[2]);
+  beginShape();
+  for(let i=0;i<10;i++){
+    const ang = TWO_PI*i/10;
+    const rad = (i%2===0)? 78 : 55;
+    vertex(rad*cos(ang), rad*sin(ang)*0.85);
+  }
+  endShape(CLOSE);
+
+  fill(255,255,255,220);
+  ellipse(-20,-8,18,12);
+  ellipse(20,-8,18,12);
+  fill(20,5,30);
+  ellipse(-20,-8,7,9);
+  ellipse(20,-8,7,9);
+
+  stroke(255,200,255,80); strokeWeight(2); noFill();
+  ellipse(0,0,150,120);
+  pop();
+}
+
+function drawAllyFigure(p, highlight){
+  push();
+  translate(p.x, p.y);
+  if(!p.alive){
+    tint(120);
+    rotate(radians(80));
+    translate(0,20);
+  }
+  const bob = p.alive ? sin(frameCount*0.05 + p.x)*4 : 0;
+  translate(0,bob);
+
+  if(highlight){
+    noStroke();
+    fill(255,225,140,60+40*sin(frameCount*0.15));
+    ellipse(0,20,110,110);
+  }
+
+  noStroke();
+  fill(0,0,0,80);
+  ellipse(0,58,70,16);
+
+  const col = (hitFlashAlly[p.id]>0) ? [255,255,255] : p.color;
+  const alpha = p.alive ? 255 : 160;
+
+  // cape/body
+  fill(col[0],col[1],col[2],alpha);
+  beginShape();
+  vertex(-20,50); vertex(20,50); vertex(15,-10); vertex(-15,-10);
+  endShape(CLOSE);
+
+  // head
+  fill(255,225,205,alpha);
+  circle(0,-30,34);
+  // hair
+  fill(col[0]*0.6, col[1]*0.6, col[2]*0.6, alpha);
+  arc(0,-38,36,30,PI,TWO_PI);
+  // eyes
+  fill(30,20,20,alpha);
+  circle(-6,-30,3.5);
+  circle(6,-30,3.5);
+
+  // weapon accent
+  stroke(255,255,255,alpha*0.7); strokeWeight(2.5);
+  line(20,-5,32,42);
+
+  pop();
+  noTint();
+}
+
+function drawBossLives(barX, barY){
+  push();
+  noStroke();
+  for(let i=0;i<boss.lives;i++){
+    fill(255,60,60);
+    stroke(255,180,180);
+    strokeWeight(1);
+    circle(barX + 7 + i*16, barY - 8, 10);
+  }
+  pop();
+}
+
+function drawBossDamagePanel(){
+  // 画面右端やや上、他のUIと重ならない位置に最新ダメージのみ表示
+  const px = W - 20, py = 260;
+  push();
+  if(lastBossDamage){
+    rectMode(CENTER);
+    fill(10,8,18,180);
+    stroke(255,221,120,150);
+    strokeWeight(1.5);
+    rect(px-70, py, 140, 56, 8);
+
+    noStroke();
+    fill(200,190,220);
+    textAlign(CENTER,CENTER);
+    textSize(11);
+    text('与えたダメージ', px-70, py-16);
+
+    fill(lastBossDamage.skill ? color(255,221,120) : color(255,255,255));
+    textSize(20);
+    text(lastBossDamage.text, px-70, py+8);
+  }
+  pop();
+}
+
+function drawHPBar(x,y,w,h,ratio,frontColor,showPercent){
+  ratio = constrain(ratio,0,1);
+  push();
+  rectMode(CORNER);
+  noStroke();
+  fill(20,15,25,220);
+  rect(x,y,w,h,h/2);
+
+  let col;
+  if(ratio > 0.5) col = lerpColor(color(255,205,90), color(frontColor[0],frontColor[1],frontColor[2]), (ratio-0.5)*2);
+  else col = lerpColor(color(220,60,60), color(255,205,90), ratio*2);
+
+  fill(col);
+  if(ratio>0.02) rect(x,y,w*ratio,h,h/2);
+
+  noFill();
+  stroke(232,200,116,200);
+  strokeWeight(1.5);
+  rect(x,y,w,h,h/2);
+
+  if(showPercent){
+    noStroke();
+    fill(255);
+    textAlign(CENTER,CENTER);
+    textSize(12);
+    text(floor(ratio*100)+' %', x+w/2, y+h/2+1);
+  }
+  pop();
+}
+
+function drawEPGauge(x,y,r,ratio){
+  ratio = constrain(ratio,0,1);
+  push();
+  noStroke();
+  fill(15,12,22,230);
+  circle(x,y,r*2);
+
+  drawingContext.save();
+  drawingContext.beginPath();
+  drawingContext.arc(x,y,r-1.5,0,Math.PI*2);
+  drawingContext.clip();
+  const fillH = (r*2) * ratio;
+  noStroke();
+  fill(120,205,255);
+  rectMode(CORNER);
+  rect(x-r, y+r-fillH, r*2, fillH+2);
+  drawingContext.restore();
+
+  noFill();
+  stroke(180,220,255,220);
+  strokeWeight(2);
+  circle(x,y,r*2);
+
+  noStroke();
+  fill(255);
+  textAlign(CENTER,CENTER);
+  textSize(9);
+  text(floor(ratio*100), x, y+1);
+
+  fill(180,220,255,200);
+  textSize(8);
+  text('EP', x, y-r-7);
+  pop();
+}
+
+function drawTurnOrderPanel(){
+  push();
+  rectMode(CORNER);
+  fill(10,8,18,190);
+  stroke(232,200,116,180);
+  strokeWeight(1.5);
+  rect(16,16,225,205,10);
+
+  noStroke();
+  fill(232,200,116);
+  textAlign(LEFT,TOP);
+  textSize(13);
+  text('◆ 行動順', 30, 26);
+
+  if(currentActor){
+    fill(255,240,190);
+    textSize(15);
+    text('現在: ' + currentActor.name, 30, 50);
+    stroke(currentActor.isAlly ? color(120,190,255) : color(255,120,140));
+    strokeWeight(2);
+    line(30, 72, 225, 72);
+    noStroke();
+  }
+
+  textSize(12);
+  for(let i=0;i<upcomingQueue.length;i++){
+    const u = upcomingQueue[i];
+    fill(u.isAlly ? color(150,200,255) : color(255,140,150));
+    text((i+1)+'.  '+u.name, 30, 84 + i*22);
+  }
+  pop();
+}
+
+function drawCommandPanel(){
+  push();
+  rectMode(CORNER);
+  fill(10,8,18,190);
+  stroke(232,200,116,180);
+  strokeWeight(1.5);
+  rect(cmdPanel.x, cmdPanel.y, cmdPanel.w, cmdPanel.h, 10);
+
+  // --- SP表示（コマンドの左側） ---
+  noStroke();
+  fill(232,200,116);
+  textAlign(CENTER,CENTER);
+  textSize(12);
+  text('SP', spPipArea.x, cmdPanel.y + 14);
+  for(let i=0;i<MAX_SP;i++){
+    const px = spPipArea.x;
+    const py = spPipArea.y + i*spPipArea.gap;
+    if(i < sp){
+      fill(255,221,120);
+      stroke(255,240,190);
+    } else {
+      fill(40,35,50);
+      stroke(110,100,90);
+    }
+    strokeWeight(1.5);
+    circle(px, py, spPipArea.r*2);
+  }
+  noStroke();
+  fill(230,210,255,200);
+  textSize(11);
+  text(sp+' / '+MAX_SP, spPipArea.x, spPipArea.y + MAX_SP*spPipArea.gap + 4);
+
+  const active = (phase==='playerInput');
+  const skillUsable = active && sp > 0;
+  const skillLabel = (currentActor && currentActor.id==='p3') ? '回復' : 'スキル';
+  drawButton(btnNormal, '通常攻撃', active, [120,190,255]);
+  drawButton(btnSkill, skillLabel, skillUsable, [255,205,110]);
+  if(active && sp<=0){
+    noStroke();
+    fill(255,140,140,220);
+    textAlign(CENTER,CENTER);
+    textSize(10);
+    text('SP不足', btnSkill.x+btnSkill.w/2, btnSkill.y+btnSkill.h+12);
+  }
+
+  if(!active){
+    noStroke();
+    fill(200,200,210,180);
+    textAlign(CENTER,CENTER);
+    textSize(11);
+    text(currentActor ? (currentActor.name+' の行動中…') : '', cmdPanel.x+cmdPanel.w/2+30, cmdPanel.y+cmdPanel.h-12);
+  }
+  pop();
+}
+
+function drawButton(b, label, active, accent){
+  push();
+  rectMode(CORNER);
+  if(active){
+    fill(accent[0],accent[1],accent[2],60+30*sin(frameCount*0.1));
+    stroke(accent[0],accent[1],accent[2]);
+  } else {
+    fill(40,38,50,150);
+    stroke(90,90,100);
+  }
+  strokeWeight(2);
+  rect(b.x,b.y,b.w,b.h,8);
+  noStroke();
+  fill(active?255:150);
+  textAlign(CENTER,CENTER);
+  textSize(17);
+  text(label, b.x+b.w/2, b.y+b.h/2+1);
+  pop();
+}
+
+function updatePopups(){
+  for(const p of popups){
+    p.y -= 0.7;
+    p.alpha -= 4.5;
+  }
+  popups = popups.filter(p=>p.alpha>0);
+}
+function drawPopups(){
+  push();
+  textAlign(CENTER,CENTER);
+  for(const p of popups){
+    textSize(p.big?28:20);
+    stroke(0,0,0,p.alpha);
+    strokeWeight(3);
+    fill(p.color[0],p.color[1],p.color[2],p.alpha);
+    text(p.text, p.x, p.y);
+  }
+  pop();
+}
+
+/* ===================== 戦闘終了画面 ===================== */
+function drawSunMandala(x,y,size){
+  push();
+  translate(x,y);
+  rotate(frameCount*0.003);
+  noFill();
+  for(let r= size*0.4; r<size; r+=size*0.15){
+    stroke(232,200,116, 40);
+    strokeWeight(1.5);
+    circle(0,0,r*2);
+  }
+  const rays = 28;
+  for(let i=0;i<rays;i++){
+    const ang = TWO_PI*i/rays;
+    push();
+    rotate(ang);
+    const len = size*(0.55 + 0.15*sin(frameCount*0.02+i));
+    stroke(232,200,116, 90);
+    strokeWeight(3);
+    line(size*0.35,0,len,0);
+    pop();
+  }
+  noStroke();
+  fill(232,200,116,25);
+  circle(0,0,size*0.9);
+  pop();
+}
+
+function drawEndOverlay(){
+  drawSunMandala(W/2, 110, 260);
+
+  push();
+  textAlign(CENTER,CENTER);
+  stroke(15,8,5); strokeWeight(6);
+  fill(255,240,200);
+  textSize(50);
+  textStyle(BOLD);
+  text('戦 闘 終 了', W/2, 110);
+
+  noStroke();
+  fill(battleOutcome==='win' ? color(255,221,120) : color(255,120,120));
+  textSize(18);
+  textStyle(NORMAL);
+  text(battleOutcome==='win' ? '勝利' : '敗北', W/2, 155);
+  pop();
+
+  drawEndButton(btnRetry, '再挑戦する', [120,220,160]);
+  drawEndButton(btnExit, '退出する', [220,120,120]);
+}
+
+function drawEndButton(b,label,accent){
+  push();
+  rectMode(CORNER);
+  fill(20,16,28,230);
+  stroke(accent[0],accent[1],accent[2]);
+  strokeWeight(2.5);
+  rect(b.x,b.y,b.w,b.h,10);
+  noStroke();
+  fill(240,235,225);
+  textAlign(CENTER,CENTER);
+  textSize(19);
+  text(label, b.x+b.w/2, b.y+b.h/2+1);
+  pop();
+}
+
+/* ===================== 入力処理 ===================== */
+function inRect(mx,my,r){
+  return mx>=r.x && mx<=r.x+r.w && my>=r.y && my<=r.y+r.h;
+}
+
+function mousePressed(){
+  if(gameState==='title'){
+    resetBattle();
+    return;
+  }
+  if(gameState==='battle' && phase==='playerInput'){
+    if(inRect(mouseX,mouseY,btnNormal)) playerAttack('normal');
+    else if(inRect(mouseX,mouseY,btnSkill)) playerAttack('skill');
+    return;
+  }
+  if(gameState==='end'){
+    if(inRect(mouseX,mouseY,btnRetry)) resetBattle();
+    else if(inRect(mouseX,mouseY,btnExit)) gameState='title';
+    return;
+  }
+}</script>
 </body>
 </html>
