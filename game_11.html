@@ -2,21 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>塚原　優悟さんのゲーム</title>
+  <title>p5.js ゲーム作品</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
     body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
     h1 { font-size: 1.2rem; margin-bottom: 5px; }
     p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
     .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
+    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 回覧板に戻る</a>
-  <h1>塚原　優悟 (3年 番号:8)</h1>
+  <a href="index.html" class="back-link">← 一覧に戻る</a>
+  <h1>作者: 塚原</h1>
   <p>ジャグラー</p>
+  
   <script>const BONUS_PROBABILITY = 1 / 134; // 設定6並みの合算確率
 const symbols = ["🍒", "🍇", "🔔", "🤡", "７"];
 
@@ -303,5 +308,299 @@ function playGakoSound() {
   osc1.stop(audioCtx.currentTime + 0.12);
   osc2.stop(audioCtx.currentTime + 0.08);
 }</script>
+
+  <div class="code-container">
+    <h3>ソースコード</h3>
+    <pre><code class="language-javascript">const BONUS_PROBABILITY = 1 / 134; // 設定6並みの合算確率
+const symbols = [&quot;🍒&quot;, &quot;🍇&quot;, &quot;🔔&quot;, &quot;🤡&quot;, &quot;７&quot;];
+
+let gameCount = 0;
+let isRolling = false;
+let isHit = false;
+let stateText = &quot;レバーON (画面クリック) でスタート&quot;;
+
+// リール制御用変数
+let reelSymbols = [&quot;７&quot;, &quot;７&quot;, &quot;７&quot;];
+let reelAngles = []; // 回転アニメーション用
+
+// 演出管理
+let lampLit = false;
+let delayTimer = 0;
+let stopTimer = 0;
+
+function setup() {
+  // WEBGLエラーを避けるため、通常の2Dモード(WEBGLを削除)で作成
+  createCanvas(400, 600);
+  textSize(32);
+}
+
+function draw() {
+  background(20);
+
+  // --- 1. 筐体パネルの描画 ---
+  drawCabinet();
+
+  // --- 2. リールの描画と更新 ---
+  updateAndDrawReels();
+
+  // --- 3. GOGO!ランプの描画（脳汁の源泉） ---
+  drawGogoLamp();
+
+  // --- 4. 情報テキストの描画 ---
+  drawStatusText();
+
+  // --- 5. 内部タイマー処理（遅れ・後告知の管理） ---
+  handleTimers();
+}
+
+// 画面クリック＝レバーON
+function mousePressed() {
+  if (isRolling) return;
+
+  // 前回の状態をリセット
+  lampLit = false;
+  isRolling = true;
+  stateText = &quot;リール回転中...&quot;;
+  gameCount++;
+
+  // 内部抽選
+  isHit = random() &lt; BONUS_PROBABILITY;
+
+  // 演出分岐（15%の確率で「遅れ」演出）
+  let isDelayed = isHit &amp;&amp; random() &lt; 0.15;
+  
+  if (isDelayed) {
+    stateText = &quot;違和感：リール始動が遅い...！？&quot;;
+    delayTimer = 45; // 約0.7秒の遅れ
+  } else {
+    delayTimer = 1; // 即始動
+  }
+}
+
+function handleTimers() {
+  // 遅れタイマーの消化
+  if (delayTimer &gt; 0) {
+    delayTimer--;
+    if (delayTimer === 0) {
+      stopTimer = 90; // 約1.5秒間まわす
+    }
+  }
+
+  // 自動停止タイマーの消化
+  if (stopTimer &gt; 0) {
+    stopTimer--;
+    if (stopTimer === 0) {
+      stopReels();
+    }
+  }
+}
+
+function updateAndDrawReels() {
+  // リール背景
+  fill(10);
+  stroke(60);
+  strokeWeight(3);
+  rect(40, 50, 320, 140, 10);
+
+  for (let i = 0; i &lt; 3; i++) {
+    // リール個別の枠
+    fill(245);
+    noStroke();
+    rect(60 + i * 100, 60, 80, 120, 5);
+
+    // 配列の初期化保護
+    if (reelAngles[i] === undefined) reelAngles[i] = 0;
+
+    if (isRolling &amp;&amp; delayTimer === 0) {
+      // 回転中は高速で角度（位置）を変化させ、絵柄をシャッフル
+      reelAngles[i] += 40;
+      if (random() &lt; 0.3) {
+        reelSymbols[i] = random(symbols);
+      }
+    }
+
+    // 絵柄の描画
+    push();
+    textAlign(CENTER, CENTER);
+    textSize(45);
+    
+    // 7図柄だけ情熱の赤、他は黒
+    if (reelSymbols[i] === &quot;７&quot;) {
+      fill(255, 0, 0);
+    } else {
+      fill(0);
+    }
+    
+    // 縦の動きをつけるための簡易オフセット
+    let yOffset = isRolling &amp;&amp; delayTimer === 0 ? sin(reelAngles[i]) * 10 : 0;
+    text(reelSymbols[i], 100 + i * 100, 120 + yOffset);
+    pop();
+  }
+}
+
+function stopReels() {
+  if (isHit) {
+    // 当選時は綺麗に「7・7・7」を揃える
+    reelSymbols = [&quot;７&quot;, &quot;７&quot;, &quot;７&quot;];
+
+    // 25%で先告知、75%で第3停止後告知
+    if (random() &lt; 0.25) {
+      triggerGogo();
+    } else {
+      stateText = &quot;第3停止。間（フリーズ）を待て…&quot;;
+      // 0.8秒後にガコッ！
+      setTimeout(() =&gt; {
+        triggerGogo();
+      }, 800);
+    }
+  } else {
+    // ハズレ時はバラケ目を出す（7揃いを避ける）
+    reelSymbols = [random(symbols), random(symbols), random(symbols)];
+    if (reelSymbols[0] === &quot;７&quot; &amp;&amp; reelSymbols[1] === &quot;７&quot; &amp;&amp; reelSymbols[2] === &quot;７&quot;) {
+      reelSymbols[0] = &quot;🍒&quot;; 
+    }
+    stateText = &quot;ボタンプッシュで次のゲームへ&quot;;
+    isRolling = false;
+  }
+}
+
+function triggerGogo() {
+  lampLit = true;
+  playGakoSound();
+  stateText = &quot;✨BB確定✨ 脳汁大放出！！！&quot;;
+  isRolling = false;
+}
+
+function drawGogoLamp() {
+  push();
+  // 2Dモードなので座標指定を真ん中に
+  let lampX = width / 2;
+  let lampY = 360;
+
+  if (lampLit) {
+    // --- ドーパミン全開のネオン発光エフェクト ---
+    // 1. 外側の青〜紫の巨大な光の広がり（2D描画による高速グロー）
+    for (let i = 12; i &gt; 0; i--) {
+      fill(150, 0, 255, 12 - i); 
+      noStroke();
+      ellipse(lampX, lampY, 120 + i * 12, 80 + i * 8);
+    }
+    for (let i = 6; i &gt; 0; i--) {
+      fill(0, 240, 255, 25 - i * 2);
+      ellipse(lampX, lampY, 90 + i * 10, 60 + i * 7);
+    }
+
+    // 2. 点灯状態のベース
+    fill(255, 0, 180);
+    stroke(0, 255, 255);
+    strokeWeight(4);
+    ellipse(lampX, lampY, 120, 80);
+
+    // 3. 「GOGO! CHANCE」の文字発光
+    textAlign(CENTER, CENTER);
+    fill(0, 0, 100);
+    textSize(26);
+    text(&quot;GOGO!&quot;, lampX, lampY - 10);
+    textSize(14);
+    text(&quot;CHANCE&quot;, lampX, lampY + 20);
+    
+    fill(255);
+    textSize(24);
+    text(&quot;GOGO!&quot;, lampX, lampY - 12);
+    textSize(13);
+    text(&quot;CHANCE&quot;, lampX, lampY + 19);
+
+  } else {
+    // 消灯状態
+    fill(25);
+    stroke(45);
+    strokeWeight(3);
+    ellipse(lampX, lampY, 120, 80);
+
+    // うっすら見える文字
+    fill(45);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(24);
+    text(&quot;GOGO!&quot;, lampX, lampY - 5);
+    textSize(13);
+    text(&quot;CHANCE&quot;, lampX, lampY + 18);
+  }
+  pop();
+}
+
+function drawCabinet() {
+  // 外枠（ゴールド）
+  fill(30);
+  stroke(212, 175, 55);
+  strokeWeight(8);
+  rect(15, 15, width - 30, height - 30, 20);
+
+  // パネル内部の飾りライン
+  noFill();
+  stroke(100, 30, 30);
+  strokeWeight(2);
+  rect(25, 25, width - 50, height - 50, 15);
+}
+
+function drawStatusText() {
+  push();
+  fill(200);
+  textSize(16);
+  textAlign(CENTER);
+  text(`累計ゲーム数: ${gameCount} G`, width / 2, 480);
+  
+  // 状態表示（アツい状態は文字色を変える）
+  if (lampLit) {
+    fill(255, 0, 255);
+    textSize(22);
+  } else if (stateText.includes(&quot;違和感&quot;)) {
+    fill(255, 255, 0);
+    textSize(18);
+  } else {
+    fill(160);
+    textSize(16);
+  }
+  text(stateText, width / 2, 520);
+  pop();
+}
+
+// --- Web Audio API による「ガコッ！」音の合成 ---
+function playGakoSound() {
+  let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
+  // 低音の強烈なアタック
+  let osc1 = audioCtx.createOscillator();
+  let gain1 = audioCtx.createGain();
+  osc1.type = &#039;sawtooth&#039;;
+  osc1.frequency.setValueAtTime(85, audioCtx.currentTime);
+  osc1.frequency.exponentialRampToValueAtTime(35, audioCtx.currentTime + 0.12);
+  gain1.gain.setValueAtTime(1.8, audioCtx.currentTime);
+  gain1.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+  
+  // 金属質の高音の響き
+  let osc2 = audioCtx.createOscillator();
+  let gain2 = audioCtx.createGain();
+  osc2.type = &#039;square&#039;;
+  osc2.frequency.setValueAtTime(150, audioCtx.currentTime);
+  osc2.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.08);
+  gain2.gain.setValueAtTime(0.9, audioCtx.currentTime);
+  gain2.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+  osc1.connect(gain1);
+  gain1.connect(audioCtx.destination);
+  osc2.connect(gain2);
+  gain2.connect(audioCtx.destination);
+
+  osc1.start();
+  osc2.start();
+  osc1.stop(audioCtx.currentTime + 0.12);
+  osc2.stop(audioCtx.currentTime + 0.08);
+}</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>
