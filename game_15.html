@@ -19,793 +19,937 @@
 </head>
 <body>
   <a href="index.html" class="back-link">← 一覧に戻る</a>
-  <h1>作者: 岩崎</h1>
-  <p>戦車ゲーム　ｗ、ｓ、ｄ、ａで操作</p>
+  <h1>作者: HO</h1>
+  <p>よけてください（WAVEを31までがんばってください）</p>
   
-  <script>let tank;
+  <script>let player;
 let bullets = [];
-let dustParticles = []; 
-let tracks = []; 
-let camAngleX = 0; 
+let enemyBullets = [];
+let enemies = [];
+
+let score = 0;
+let wave = 1;
+let gameOver = false;
+
+let shootTimer = 0;
+
+// ====================
+// セットアップ
+// ====================
 
 function setup() {
-  createCanvas(800, 600, WEBGL);
-  tank = new OlifantMk2(0, 0);
+  createCanvas(600, 600);
+
+  player = {
+    x: width / 2,
+    y: height - 60,
+    speed: 6,
+    size: 30
+  };
+
+  createWave();
 }
+
+// ====================
+// 敵ウェーブ
+// ====================
+
+function createWave() {
+  enemies = [];
+
+  let rows = min(2 + wave, 7);
+  let cols = 8 + min(wave, 4);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      enemies.push({
+        x: 50 + col * (500 / (cols - 1)),
+        y: 60 + row * 45,
+
+        speed: 1.5 + wave * 0.2,
+        size: 32,
+
+        // 敵ごとに発射タイミングを変える
+        shootTimer: random(30, 180)
+      });
+    }
+  }
+}
+
+// ====================
+// メイン
+// ====================
 
 function draw() {
-  background(160, 200, 240); // 砂漠の快晴の空
+  background(5, 10, 25);
 
-  // ライト（強い日光を再現）
-  ambientLight(150);
-  directionalLight(255, 245, 220, 0.6, 0.8, -0.4);
-
-  if (focused) {
-    camAngleX = map(mouseX, 0, width, -PI, PI);
+  if (gameOver) {
+    drawGameOver();
+    return;
   }
 
-  // 三人称カメラ
-  let camRadius = 280;
-  let camX = tank.x + sin(camAngleX) * camRadius;
-  let camY = tank.y + cos(camAngleX) * camRadius;
-  let camZ = 120;
-  camera(camX, camY, camZ, tank.x, tank.y, 15, 0, 0, -1);
+  movePlayer();
+  drawPlayer();
 
-  // 🌟 軽量化された3D砂漠の地面を描画（バグ対策版）
-  drawLightDesert();
+  updatePlayerBullets();
+  updateEnemies();
+  updateEnemyBullets();
 
-  // 通った跡（履帯痕）の更新と描画
-  drawTankTracks();
+  checkPlayerBulletHits();
+  checkEnemyBulletHits();
 
-  // 砂煙の更新と描画
-  for (let i = dustParticles.length - 1; i >= 0; i--) {
-    dustParticles[i].update();
-    dustParticles[i].display();
-    if (dustParticles[i].isExpired()) dustParticles.splice(i, 1);
+  // 敵を全滅
+  if (enemies.length === 0) {
+    wave++;
+    createWave();
+    enemyBullets = [];
   }
 
-  // 弾の更新と描画
-  for (let i = bullets.length - 1; i >= 0; i--) {
-    bullets[i].update();
-    bullets[i].display();
-    if (bullets[i].isExpired()) bullets.splice(i, 1);
-  }
-
-  // 戦車の更新と描画
-  tank.update(camAngleX);
-  tank.display();
-
-  // 2D UIの表示
-  push();
-  resetMatrix();
-  camera(); 
-  ortho();  
-  drawUI();
-  pop();
-}
-
-// 🌟 軽量な砂漠地面の描画（フリーズ対策）
-function drawLightDesert() {
-  push();
-  noStroke();
-  // 太陽の光を浴びた暖かい砂の色
-  fill(225, 195, 140);
-  // 広大な砂漠の平面を1枚の大きなポリゴンで描画し負荷をゼロに
-  translate(0, 0, -1);
-  plane(4000, 4000);
-  
-  // 砂漠の地平線に薄い模様をつけて距離感を出す（グリッドの代わりに点在する砂目）
-  stroke(205, 175, 120);
-  strokeWeight(2);
-  for (let i = -2000; i <= 2000; i += 200) {
-    line(i, -2000, 0, i, 2000, 0);
-    line(-2000, i, 0, 2000, i, 0);
-  }
-  pop();
-}
-
-// 履帯痕を描画する関数
-function drawTankTracks() {
-  push();
-  stroke(120, 105, 80); // 砂が踏み固められた影の色
-  strokeWeight(3.5);     // キャタピラの幅
-  noFill();
-  
-  for (let t of tracks) {
-    beginShape(LINES);
-    vertex(t.x1, t.y1, t.z1);
-    vertex(t.x2, t.y2, t.z2);
-    endShape();
-  }
-  pop();
-}
-
-function drawUI() {
-  noStroke();
-  fill(0, 160);
-  rect(-width/2 + 20, -height/2 + 20, 320, 80, 5);
+  // UI
   fill(255);
-  textSize(13);
-  text("OLIFANT MK2 - South African MBT", -width/2 + 30, -height/2 + 38);
-  
-  textSize(11);
-  fill(200);
-  text("A/D: 旋回  /  S: 前進（反転済み）  /  W: 後退", -width/2 + 30, -height/2 + 54);
-  text("Fキー(長押し): カメラ方向へ旋回 ＆ 射撃", -width/2 + 30, -height/2 + 68);
-  
-  let reloadProgress = min(1, tank.reloadTimer / tank.reloadSpeed);
-  fill(reloadProgress === 1 ? color(0, 255, 100) : color(255, 140, 0));
-  rect(-width/2 + 30, -height/2 + 78, 150 * reloadProgress, 8);
+  textSize(20);
+  text("SCORE: " + score, 20, 30);
+  text("WAVE: " + wave, 20, 55);
 }
 
-// 砂煙クラス
-class DustParticle {
-  constructor(x, y, z, angle, speed) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    let spreadAngle = angle + PI + random(-0.4, 0.4);
-    let pushPower = max(1.0, abs(speed) * 0.5);
-    this.vx = sin(spreadAngle) * pushPower + random(-0.3, 0.3);
-    this.vy = -cos(spreadAngle) * pushPower + random(-0.3, 0.3);
-    this.vz = random(0.4, 1.2);
-    this.size = random(4, 7);  
-    this.maxLife = random(25, 40); 
-    this.life = this.maxLife;
-    this.col = color(225, 195, 140, 180);
+// ====================
+// プレイヤー移動
+// ====================
+
+function movePlayer() {
+
+  if (keyIsDown(LEFT_ARROW)) {
+    player.x -= player.speed;
   }
 
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.z += this.vz;
-    this.vx *= 0.93;
-    this.vy *= 0.93;
-    this.vz *= 0.94;
-    this.size += 0.3;
-    this.life--;
+  if (keyIsDown(RIGHT_ARROW)) {
+    player.x += player.speed;
   }
 
-  display() {
-    push();
-    translate(this.x, this.y, this.z);
-    noStroke();
-    let alphaVal = map(this.life, 0, this.maxLife, 0, 130);
-    this.col.setAlpha(alphaVal);
-    fill(this.col);
-    sphere(this.size, 4, 4); 
-    pop();
+  if (keyIsDown(UP_ARROW)) {
+    player.y -= player.speed;
   }
 
-  isExpired() { return this.life <= 0; }
+  if (keyIsDown(DOWN_ARROW)) {
+    player.y += player.speed;
+  }
+
+  player.x = constrain(player.x, 20, width - 20);
+  player.y = constrain(player.y, 20, height - 20);
 }
 
-// 戦車クラス
-class OlifantMk2 {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.bodyAngle = 0;    
-    this.turretAngle = 0;  
-    
-    this.moveSpeed = 0;
-    this.maxSpeed = 3.5;   
-    this.accel = 0.08;     
-    this.friction = 0.05;  
-    this.rotSpeed = 0.035; 
-    this.turretRotSpeed = 0.025; 
-    
-    this.reloadSpeed = 180; 
-    this.reloadTimer = this.reloadSpeed;
-    this.size = 55;
+// ====================
+// プレイヤー
+// ====================
 
-    this.trackCounter = 0;
-    this.lastLeft = null;
-    this.lastRight = null;
-  }
+function drawPlayer() {
 
-  update(currentCamAngle) {
-    if (this.reloadTimer < this.reloadSpeed) this.reloadTimer++;
+  fill(0, 200, 255);
 
-    let keyL = key.toLowerCase();
-    let isMoving = false;
-    
-    if ((keyIsPressed && (keyL === 'a')) || keyIsDown(LEFT_ARROW)) {
-      this.bodyAngle -= this.rotSpeed;
-      isMoving = true;
-    }
-    if ((keyIsPressed && (keyL === 'd')) || keyIsDown(RIGHT_ARROW)) {
-      this.bodyAngle += this.rotSpeed;
-      isMoving = true;
-    }
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 22,
+    player.y + 20,
+    player.x + 22,
+    player.y + 20
+  );
+}
 
-    // Sキーで前進
-    if ((keyIsPressed && (keyL === 's')) || keyIsDown(DOWN_ARROW)) {
-      this.moveSpeed = min(this.moveSpeed + this.accel, this.maxSpeed);
-      isMoving = true;
-    } 
-    // Wキーで後退
-    else if ((keyIsPressed && (keyL === 'w')) || keyIsDown(UP_ARROW)) {
-      this.moveSpeed = max(this.moveSpeed - this.accel, -this.maxSpeed * 0.5);
-      isMoving = true;
-    } 
-    else {
-      if (this.moveSpeed > 0) this.moveSpeed = max(0, this.moveSpeed - this.friction);
-      if (this.moveSpeed < 0) this.moveSpeed = min(0, this.moveSpeed + this.friction);
-    }
+// ====================
+// プレイヤーの弾
+// ====================
 
-    this.x += sin(this.bodyAngle) * this.moveSpeed;
-    this.y -= cos(this.bodyAngle) * this.moveSpeed;
+function updatePlayerBullets() {
 
-    // 地面の高さ（固定）
-    let terrainZ = 0;
+  fill(255, 255, 80);
 
-    // キャタピラ位置計算
-    let leftTrackX = this.x + sin(this.bodyAngle - HALF_PI) * (this.size * 0.4);
-    let leftTrackY = this.y - cos(this.bodyAngle - HALF_PI) * (this.size * 0.4);
-    let rightTrackX = this.x + sin(this.bodyAngle + HALF_PI) * (this.size * 0.4);
-    let rightTrackY = this.y - cos(this.bodyAngle + HALF_PI) * (this.size * 0.4);
+  for (let i = bullets.length - 1; i >= 0; i--) {
 
-    // 走行痕と砂煙の生成
-    if (isMoving || abs(this.moveSpeed) > 0.1) {
-      this.trackCounter++;
-      if (this.trackCounter % 3 === 0) {
-        if (this.lastLeft && this.lastRight) {
-          tracks.push({ x1: this.lastLeft.x, y1: this.lastLeft.y, z1: 0.2, x2: leftTrackX, y2: leftTrackY, z2: 0.2 });
-          tracks.push({ x1: this.lastRight.x, y1: this.lastRight.y, z1: 0.2, x2: rightTrackX, y2: rightTrackY, z2: 0.2 });
-          
-          if (tracks.length > 400) { tracks.shift(); tracks.shift(); } 
-        }
-        this.lastLeft = { x: leftTrackX, y: leftTrackY };
-        this.lastRight = { x: rightTrackX, y: rightTrackY };
-      }
+    let b = bullets[i];
 
-      if (random(1) < 0.5) {
-        dustParticles.push(new DustParticle(leftTrackX, leftTrackY, terrainZ, this.bodyAngle, this.moveSpeed));
-        dustParticles.push(new DustParticle(rightTrackX, rightTrackY, terrainZ, this.bodyAngle, this.moveSpeed));
-      }
-    } else {
-      this.lastLeft = null;
-      this.lastRight = null;
-    }
+    b.x += b.vx;
+    b.y += b.vy;
 
-    // Fキーによる旋回・射撃
-    if (keyIsPressed && keyL === 'f') { 
-      let targetTurretAngle = currentCamAngle + PI; 
-      let turretAngleDiff = targetTurretAngle - this.turretAngle;
-      while (turretAngleDiff < -PI) turretAngleDiff += TWO_PI;
-      while (turretAngleDiff > PI)  turretAngleDiff -= TWO_PI;
+    ellipse(b.x, b.y, 8, 15);
 
-      if (abs(turretAngleDiff) > this.turretRotSpeed) {
-        this.turretAngle += (turretAngleDiff > 0) ? this.turretRotSpeed : -this.turretRotSpeed;
-      } else {
-        this.turretAngle = targetTurretAngle;
-      }
-
-      if (abs(turretAngleDiff) < 0.05) {
-        this.fire();
-      }
-    }
-  }
-
-  display() {
-    push();
-    translate(this.x, this.y, 10); 
-
-    let sandColor = color(135, 115, 90);    
-    let greenColor = color(75, 85, 65);     
-    let darkColor = color(50, 48, 43);      
-
-    // 車体
-    push();
-    rotateZ(this.bodyAngle);
-    fill(sandColor);
-    stroke(40);
-    box(this.size * 0.95, this.size * 1.65, 14); 
-    
-    push();
-    translate(0, this.size * 0.8, 2);
-    rotateX(-0.4); 
-    fill(greenColor); 
-    box(this.size * 0.93, 14, 10);
-    pop();
-
-    for (let offset = -0.7; offset <= 0.7; offset += 0.25) {
-      let segmentColor = (abs(offset) < 0.3) ? greenColor : sandColor;
-      fill(segmentColor);
-      push(); translate(-this.size * 0.52, this.size * offset, -2); box(4, this.size * 0.23, 16); pop();
-      push(); translate(this.size * 0.52, this.size * offset, -2); box(4, this.size * 0.23, 16); pop();
-    }
-    pop();
-
-    // 砲塔
-    push();
-    translate(0, -this.size * 0.05, 12); 
-    rotateZ(this.turretAngle);
-    
-    fill(sandColor);
-    stroke(40);
-    box(this.size * 0.75, this.size * 0.85, 12);
-    
-    fill(greenColor); 
-    push();
-    translate(-this.size * 0.22, this.size * 0.25, 1);
-    rotateZ(0.25);
-    box(14, this.size * 0.55, 12);
-    pop();
-
-    fill(sandColor); 
-    push();
-    translate(this.size * 0.22, this.size * 0.25, 1);
-    rotateZ(-0.25);
-    box(14, this.size * 0.55, 12);
-    pop();
-
-    fill(sandColor);
-    push();
-    translate(0, -this.size * 0.45, 1);
-    box(this.size * 0.6, 12, 10);
-    pop();
-
-    fill(darkColor); 
-    push();
-    translate(-this.size * 0.2, -this.size * 0.05, 10); 
-    box(8, 8, 16); 
-    fill(greenColor);
-    translate(0, 2, 6);
-    box(10, 6, 4);
-    pop();
-
-    // 主砲
-    fill(darkColor); 
-    stroke(30);
-    push();
-    translate(0, this.size * 0.9, 0); 
-    box(4, this.size * 1.1, 4); 
-    
-    translate(0, -this.size * 0.45, 0);
-    fill(greenColor);
-    box(12, 16, 8);
-    pop();
-    
-    pop(); 
-
-    pop();
-  }
-
-  fire() {
-    if (this.reloadTimer >= this.reloadSpeed) {
-      let bX = this.x + sin(this.turretAngle) * (this.size * 1.5);
-      let bY = this.y - cos(this.turretAngle) * (this.size * 1.5);
-      let bZ = 24; 
-      
-      bullets.push(new WT_Bullet3D(bX, bY, bZ, this.turretAngle));
-      this.reloadTimer = 0; 
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      bullets.splice(i, 1);
     }
   }
 }
 
-// 3D弾丸クラス
-class WT_Bullet3D {
-  constructor(x, y, z, angle) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.angle = angle;
-    this.speed = 24; 
-    this.life = 80;  
+// ====================
+// 敵
+// ====================
+
+function updateEnemies() {
+
+  for (let enemy of enemies) {
+
+    enemy.x += enemy.speed;
+
+    if (enemy.x > width - 20 || enemy.x < 20) {
+      enemy.speed *= -1;
+      enemy.y += 15;
+    }
+
+    fill(255, 60, 80);
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // ----------------
+    // 敵が弾を撃つ
+    // ----------------
+
+    enemy.shootTimer--;
+
+    if (enemy.shootTimer <= 0) {
+
+      shootEnemyBullets(enemy);
+
+      // ウェーブが進むほど連射
+      enemy.shootTimer =
+        max(40, 150 - wave * 8) + random(20);
+    }
+
+    // 敵がプレイヤーに接触
+    if (
+      dist(
+        player.x,
+        player.y,
+        enemy.x,
+        enemy.y
+      ) < 30
+    ) {
+      gameOver = true;
+    }
+
+    // 敵が下まで来た
+    if (enemy.y > height - 50) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// 敵の弾を発射
+// ====================
+
+function shootEnemyBullets(enemy) {
+
+  // 敵から8方向に発射
+  let directions = [
+    0,
+    PI / 4,
+    PI / 2,
+    3 * PI / 4,
+    PI,
+    5 * PI / 4,
+    3 * PI / 2,
+    7 * PI / 4
+  ];
+
+  for (let angle of directions) {
+
+    let speed = 2.5 + wave * 0.15;
+
+    enemyBullets.push({
+      x: enemy.x,
+      y: enemy.y,
+
+      vx: cos(angle) * speed,
+      vy: sin(angle) * speed,
+
+      size: 8
+    });
+  }
+}
+
+// ====================
+// 敵の弾
+// ====================
+
+function updateEnemyBullets() {
+
+  fill(255, 100, 30);
+
+  for (
+    let i = enemyBullets.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let b = enemyBullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(
+      b.x,
+      b.y,
+      b.size
+    );
+
+    // 画面外
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // プレイヤーに当たった
+    let d = dist(
+      b.x,
+      b.y,
+      player.x,
+      player.y
+    );
+
+    if (d < player.size / 2 + b.size / 2) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーの弾 vs 敵
+// ====================
+
+function checkPlayerBulletHits() {
+
+  for (
+    let i = enemies.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    for (
+      let j = bullets.length - 1;
+      j >= 0;
+      j--
+    ) {
+
+      let b = bullets[j];
+
+      let d = dist(
+        b.x,
+        b.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (d < enemy.size / 2 + 6) {
+
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+
+        score += 100;
+
+        break;
+      }
+    }
+  }
+}
+
+// ====================
+// 敵の弾 vs プレイヤー
+// ====================
+
+function checkEnemyBulletHits() {
+
+  // 念のためここでもチェック
+  for (let b of enemyBullets) {
+
+    if (
+      dist(
+        b.x,
+        b.y,
+        player.x,
+        player.y
+      ) < 18
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーのショット
+// ====================
+
+function keyPressed() {
+
+  if (key === ' ') {
+
+    // 真上
+    bullets.push({
+      x: player.x,
+      y: player.y - 25,
+      vx: 0,
+      vy: -10
+    });
+
+    // 左上
+    bullets.push({
+      x: player.x - 10,
+      y: player.y - 20,
+      vx: -3,
+      vy: -10
+    });
+
+    // 右上
+    bullets.push({
+      x: player.x + 10,
+      y: player.y - 20,
+      vx: 3,
+      vy: -10
+    });
   }
 
-  update() {
-    this.x += sin(this.angle) * this.speed;
-    this.y -= cos(this.angle) * this.speed;
-    this.life--;
+  // リスタート
+  if (key === 'r' || key === 'R') {
+    restartGame();
   }
+}
 
-  display() {
-    push();
-    translate(this.x, this.y, this.z);
-    noStroke();
-    fill(255, 230, 120); 
-    sphere(2); 
-    pop();
-  }
+// ====================
+// ゲームオーバー
+// ====================
 
-  isExpired() { return this.life <= 0; }
+function drawGameOver() {
+
+  fill(255, 50, 50);
+  textAlign(CENTER);
+
+  textSize(50);
+  text(
+    "GAME OVER",
+    width / 2,
+    height / 2
+  );
+
+  fill(255);
+  textSize(20);
+
+  text(
+    "SCORE: " + score,
+    width / 2,
+    height / 2 + 45
+  );
+
+  text(
+    "WAVE: " + wave,
+    width / 2,
+    height / 2 + 75
+  );
+
+  text(
+    "Rキーでリスタート",
+    width / 2,
+    height / 2 + 110
+  );
+
+  textAlign(LEFT);
+}
+
+// ====================
+// リスタート
+// ====================
+
+function restartGame() {
+
+  bullets = [];
+  enemyBullets = [];
+
+  score = 0;
+  wave = 1;
+  gameOver = false;
+
+  player.x = width / 2;
+  player.y = height - 60;
+
+  createWave();
 }</script>
 
   <div class="code-container">
     <h3>ソースコード</h3>
-    <pre><code class="language-javascript">let tank;
+    <pre><code class="language-javascript">let player;
 let bullets = [];
-let dustParticles = []; 
-let tracks = []; 
-let camAngleX = 0; 
+let enemyBullets = [];
+let enemies = [];
+
+let score = 0;
+let wave = 1;
+let gameOver = false;
+
+let shootTimer = 0;
+
+// ====================
+// セットアップ
+// ====================
 
 function setup() {
-  createCanvas(800, 600, WEBGL);
-  tank = new OlifantMk2(0, 0);
+  createCanvas(600, 600);
+
+  player = {
+    x: width / 2,
+    y: height - 60,
+    speed: 6,
+    size: 30
+  };
+
+  createWave();
 }
+
+// ====================
+// 敵ウェーブ
+// ====================
+
+function createWave() {
+  enemies = [];
+
+  let rows = min(2 + wave, 7);
+  let cols = 8 + min(wave, 4);
+
+  for (let row = 0; row &lt; rows; row++) {
+    for (let col = 0; col &lt; cols; col++) {
+      enemies.push({
+        x: 50 + col * (500 / (cols - 1)),
+        y: 60 + row * 45,
+
+        speed: 1.5 + wave * 0.2,
+        size: 32,
+
+        // 敵ごとに発射タイミングを変える
+        shootTimer: random(30, 180)
+      });
+    }
+  }
+}
+
+// ====================
+// メイン
+// ====================
 
 function draw() {
-  background(160, 200, 240); // 砂漠の快晴の空
+  background(5, 10, 25);
 
-  // ライト（強い日光を再現）
-  ambientLight(150);
-  directionalLight(255, 245, 220, 0.6, 0.8, -0.4);
-
-  if (focused) {
-    camAngleX = map(mouseX, 0, width, -PI, PI);
+  if (gameOver) {
+    drawGameOver();
+    return;
   }
 
-  // 三人称カメラ
-  let camRadius = 280;
-  let camX = tank.x + sin(camAngleX) * camRadius;
-  let camY = tank.y + cos(camAngleX) * camRadius;
-  let camZ = 120;
-  camera(camX, camY, camZ, tank.x, tank.y, 15, 0, 0, -1);
+  movePlayer();
+  drawPlayer();
 
-  // 🌟 軽量化された3D砂漠の地面を描画（バグ対策版）
-  drawLightDesert();
+  updatePlayerBullets();
+  updateEnemies();
+  updateEnemyBullets();
 
-  // 通った跡（履帯痕）の更新と描画
-  drawTankTracks();
+  checkPlayerBulletHits();
+  checkEnemyBulletHits();
 
-  // 砂煙の更新と描画
-  for (let i = dustParticles.length - 1; i &gt;= 0; i--) {
-    dustParticles[i].update();
-    dustParticles[i].display();
-    if (dustParticles[i].isExpired()) dustParticles.splice(i, 1);
+  // 敵を全滅
+  if (enemies.length === 0) {
+    wave++;
+    createWave();
+    enemyBullets = [];
   }
 
-  // 弾の更新と描画
-  for (let i = bullets.length - 1; i &gt;= 0; i--) {
-    bullets[i].update();
-    bullets[i].display();
-    if (bullets[i].isExpired()) bullets.splice(i, 1);
-  }
-
-  // 戦車の更新と描画
-  tank.update(camAngleX);
-  tank.display();
-
-  // 2D UIの表示
-  push();
-  resetMatrix();
-  camera(); 
-  ortho();  
-  drawUI();
-  pop();
-}
-
-// 🌟 軽量な砂漠地面の描画（フリーズ対策）
-function drawLightDesert() {
-  push();
-  noStroke();
-  // 太陽の光を浴びた暖かい砂の色
-  fill(225, 195, 140);
-  // 広大な砂漠の平面を1枚の大きなポリゴンで描画し負荷をゼロに
-  translate(0, 0, -1);
-  plane(4000, 4000);
-  
-  // 砂漠の地平線に薄い模様をつけて距離感を出す（グリッドの代わりに点在する砂目）
-  stroke(205, 175, 120);
-  strokeWeight(2);
-  for (let i = -2000; i &lt;= 2000; i += 200) {
-    line(i, -2000, 0, i, 2000, 0);
-    line(-2000, i, 0, 2000, i, 0);
-  }
-  pop();
-}
-
-// 履帯痕を描画する関数
-function drawTankTracks() {
-  push();
-  stroke(120, 105, 80); // 砂が踏み固められた影の色
-  strokeWeight(3.5);     // キャタピラの幅
-  noFill();
-  
-  for (let t of tracks) {
-    beginShape(LINES);
-    vertex(t.x1, t.y1, t.z1);
-    vertex(t.x2, t.y2, t.z2);
-    endShape();
-  }
-  pop();
-}
-
-function drawUI() {
-  noStroke();
-  fill(0, 160);
-  rect(-width/2 + 20, -height/2 + 20, 320, 80, 5);
+  // UI
   fill(255);
-  textSize(13);
-  text(&quot;OLIFANT MK2 - South African MBT&quot;, -width/2 + 30, -height/2 + 38);
-  
-  textSize(11);
-  fill(200);
-  text(&quot;A/D: 旋回  /  S: 前進（反転済み）  /  W: 後退&quot;, -width/2 + 30, -height/2 + 54);
-  text(&quot;Fキー(長押し): カメラ方向へ旋回 ＆ 射撃&quot;, -width/2 + 30, -height/2 + 68);
-  
-  let reloadProgress = min(1, tank.reloadTimer / tank.reloadSpeed);
-  fill(reloadProgress === 1 ? color(0, 255, 100) : color(255, 140, 0));
-  rect(-width/2 + 30, -height/2 + 78, 150 * reloadProgress, 8);
+  textSize(20);
+  text(&quot;SCORE: &quot; + score, 20, 30);
+  text(&quot;WAVE: &quot; + wave, 20, 55);
 }
 
-// 砂煙クラス
-class DustParticle {
-  constructor(x, y, z, angle, speed) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    let spreadAngle = angle + PI + random(-0.4, 0.4);
-    let pushPower = max(1.0, abs(speed) * 0.5);
-    this.vx = sin(spreadAngle) * pushPower + random(-0.3, 0.3);
-    this.vy = -cos(spreadAngle) * pushPower + random(-0.3, 0.3);
-    this.vz = random(0.4, 1.2);
-    this.size = random(4, 7);  
-    this.maxLife = random(25, 40); 
-    this.life = this.maxLife;
-    this.col = color(225, 195, 140, 180);
+// ====================
+// プレイヤー移動
+// ====================
+
+function movePlayer() {
+
+  if (keyIsDown(LEFT_ARROW)) {
+    player.x -= player.speed;
   }
 
-  update() {
-    this.x += this.vx;
-    this.y += this.vy;
-    this.z += this.vz;
-    this.vx *= 0.93;
-    this.vy *= 0.93;
-    this.vz *= 0.94;
-    this.size += 0.3;
-    this.life--;
+  if (keyIsDown(RIGHT_ARROW)) {
+    player.x += player.speed;
   }
 
-  display() {
-    push();
-    translate(this.x, this.y, this.z);
-    noStroke();
-    let alphaVal = map(this.life, 0, this.maxLife, 0, 130);
-    this.col.setAlpha(alphaVal);
-    fill(this.col);
-    sphere(this.size, 4, 4); 
-    pop();
+  if (keyIsDown(UP_ARROW)) {
+    player.y -= player.speed;
   }
 
-  isExpired() { return this.life &lt;= 0; }
+  if (keyIsDown(DOWN_ARROW)) {
+    player.y += player.speed;
+  }
+
+  player.x = constrain(player.x, 20, width - 20);
+  player.y = constrain(player.y, 20, height - 20);
 }
 
-// 戦車クラス
-class OlifantMk2 {
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    this.bodyAngle = 0;    
-    this.turretAngle = 0;  
-    
-    this.moveSpeed = 0;
-    this.maxSpeed = 3.5;   
-    this.accel = 0.08;     
-    this.friction = 0.05;  
-    this.rotSpeed = 0.035; 
-    this.turretRotSpeed = 0.025; 
-    
-    this.reloadSpeed = 180; 
-    this.reloadTimer = this.reloadSpeed;
-    this.size = 55;
+// ====================
+// プレイヤー
+// ====================
 
-    this.trackCounter = 0;
-    this.lastLeft = null;
-    this.lastRight = null;
-  }
+function drawPlayer() {
 
-  update(currentCamAngle) {
-    if (this.reloadTimer &lt; this.reloadSpeed) this.reloadTimer++;
+  fill(0, 200, 255);
 
-    let keyL = key.toLowerCase();
-    let isMoving = false;
-    
-    if ((keyIsPressed &amp;&amp; (keyL === &#039;a&#039;)) || keyIsDown(LEFT_ARROW)) {
-      this.bodyAngle -= this.rotSpeed;
-      isMoving = true;
-    }
-    if ((keyIsPressed &amp;&amp; (keyL === &#039;d&#039;)) || keyIsDown(RIGHT_ARROW)) {
-      this.bodyAngle += this.rotSpeed;
-      isMoving = true;
-    }
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 22,
+    player.y + 20,
+    player.x + 22,
+    player.y + 20
+  );
+}
 
-    // Sキーで前進
-    if ((keyIsPressed &amp;&amp; (keyL === &#039;s&#039;)) || keyIsDown(DOWN_ARROW)) {
-      this.moveSpeed = min(this.moveSpeed + this.accel, this.maxSpeed);
-      isMoving = true;
-    } 
-    // Wキーで後退
-    else if ((keyIsPressed &amp;&amp; (keyL === &#039;w&#039;)) || keyIsDown(UP_ARROW)) {
-      this.moveSpeed = max(this.moveSpeed - this.accel, -this.maxSpeed * 0.5);
-      isMoving = true;
-    } 
-    else {
-      if (this.moveSpeed &gt; 0) this.moveSpeed = max(0, this.moveSpeed - this.friction);
-      if (this.moveSpeed &lt; 0) this.moveSpeed = min(0, this.moveSpeed + this.friction);
-    }
+// ====================
+// プレイヤーの弾
+// ====================
 
-    this.x += sin(this.bodyAngle) * this.moveSpeed;
-    this.y -= cos(this.bodyAngle) * this.moveSpeed;
+function updatePlayerBullets() {
 
-    // 地面の高さ（固定）
-    let terrainZ = 0;
+  fill(255, 255, 80);
 
-    // キャタピラ位置計算
-    let leftTrackX = this.x + sin(this.bodyAngle - HALF_PI) * (this.size * 0.4);
-    let leftTrackY = this.y - cos(this.bodyAngle - HALF_PI) * (this.size * 0.4);
-    let rightTrackX = this.x + sin(this.bodyAngle + HALF_PI) * (this.size * 0.4);
-    let rightTrackY = this.y - cos(this.bodyAngle + HALF_PI) * (this.size * 0.4);
+  for (let i = bullets.length - 1; i &gt;= 0; i--) {
 
-    // 走行痕と砂煙の生成
-    if (isMoving || abs(this.moveSpeed) &gt; 0.1) {
-      this.trackCounter++;
-      if (this.trackCounter % 3 === 0) {
-        if (this.lastLeft &amp;&amp; this.lastRight) {
-          tracks.push({ x1: this.lastLeft.x, y1: this.lastLeft.y, z1: 0.2, x2: leftTrackX, y2: leftTrackY, z2: 0.2 });
-          tracks.push({ x1: this.lastRight.x, y1: this.lastRight.y, z1: 0.2, x2: rightTrackX, y2: rightTrackY, z2: 0.2 });
-          
-          if (tracks.length &gt; 400) { tracks.shift(); tracks.shift(); } 
-        }
-        this.lastLeft = { x: leftTrackX, y: leftTrackY };
-        this.lastRight = { x: rightTrackX, y: rightTrackY };
-      }
+    let b = bullets[i];
 
-      if (random(1) &lt; 0.5) {
-        dustParticles.push(new DustParticle(leftTrackX, leftTrackY, terrainZ, this.bodyAngle, this.moveSpeed));
-        dustParticles.push(new DustParticle(rightTrackX, rightTrackY, terrainZ, this.bodyAngle, this.moveSpeed));
-      }
-    } else {
-      this.lastLeft = null;
-      this.lastRight = null;
-    }
+    b.x += b.vx;
+    b.y += b.vy;
 
-    // Fキーによる旋回・射撃
-    if (keyIsPressed &amp;&amp; keyL === &#039;f&#039;) { 
-      let targetTurretAngle = currentCamAngle + PI; 
-      let turretAngleDiff = targetTurretAngle - this.turretAngle;
-      while (turretAngleDiff &lt; -PI) turretAngleDiff += TWO_PI;
-      while (turretAngleDiff &gt; PI)  turretAngleDiff -= TWO_PI;
+    ellipse(b.x, b.y, 8, 15);
 
-      if (abs(turretAngleDiff) &gt; this.turretRotSpeed) {
-        this.turretAngle += (turretAngleDiff &gt; 0) ? this.turretRotSpeed : -this.turretRotSpeed;
-      } else {
-        this.turretAngle = targetTurretAngle;
-      }
-
-      if (abs(turretAngleDiff) &lt; 0.05) {
-        this.fire();
-      }
-    }
-  }
-
-  display() {
-    push();
-    translate(this.x, this.y, 10); 
-
-    let sandColor = color(135, 115, 90);    
-    let greenColor = color(75, 85, 65);     
-    let darkColor = color(50, 48, 43);      
-
-    // 車体
-    push();
-    rotateZ(this.bodyAngle);
-    fill(sandColor);
-    stroke(40);
-    box(this.size * 0.95, this.size * 1.65, 14); 
-    
-    push();
-    translate(0, this.size * 0.8, 2);
-    rotateX(-0.4); 
-    fill(greenColor); 
-    box(this.size * 0.93, 14, 10);
-    pop();
-
-    for (let offset = -0.7; offset &lt;= 0.7; offset += 0.25) {
-      let segmentColor = (abs(offset) &lt; 0.3) ? greenColor : sandColor;
-      fill(segmentColor);
-      push(); translate(-this.size * 0.52, this.size * offset, -2); box(4, this.size * 0.23, 16); pop();
-      push(); translate(this.size * 0.52, this.size * offset, -2); box(4, this.size * 0.23, 16); pop();
-    }
-    pop();
-
-    // 砲塔
-    push();
-    translate(0, -this.size * 0.05, 12); 
-    rotateZ(this.turretAngle);
-    
-    fill(sandColor);
-    stroke(40);
-    box(this.size * 0.75, this.size * 0.85, 12);
-    
-    fill(greenColor); 
-    push();
-    translate(-this.size * 0.22, this.size * 0.25, 1);
-    rotateZ(0.25);
-    box(14, this.size * 0.55, 12);
-    pop();
-
-    fill(sandColor); 
-    push();
-    translate(this.size * 0.22, this.size * 0.25, 1);
-    rotateZ(-0.25);
-    box(14, this.size * 0.55, 12);
-    pop();
-
-    fill(sandColor);
-    push();
-    translate(0, -this.size * 0.45, 1);
-    box(this.size * 0.6, 12, 10);
-    pop();
-
-    fill(darkColor); 
-    push();
-    translate(-this.size * 0.2, -this.size * 0.05, 10); 
-    box(8, 8, 16); 
-    fill(greenColor);
-    translate(0, 2, 6);
-    box(10, 6, 4);
-    pop();
-
-    // 主砲
-    fill(darkColor); 
-    stroke(30);
-    push();
-    translate(0, this.size * 0.9, 0); 
-    box(4, this.size * 1.1, 4); 
-    
-    translate(0, -this.size * 0.45, 0);
-    fill(greenColor);
-    box(12, 16, 8);
-    pop();
-    
-    pop(); 
-
-    pop();
-  }
-
-  fire() {
-    if (this.reloadTimer &gt;= this.reloadSpeed) {
-      let bX = this.x + sin(this.turretAngle) * (this.size * 1.5);
-      let bY = this.y - cos(this.turretAngle) * (this.size * 1.5);
-      let bZ = 24; 
-      
-      bullets.push(new WT_Bullet3D(bX, bY, bZ, this.turretAngle));
-      this.reloadTimer = 0; 
+    if (
+      b.x &lt; -30 ||
+      b.x &gt; width + 30 ||
+      b.y &lt; -30 ||
+      b.y &gt; height + 30
+    ) {
+      bullets.splice(i, 1);
     }
   }
 }
 
-// 3D弾丸クラス
-class WT_Bullet3D {
-  constructor(x, y, z, angle) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.angle = angle;
-    this.speed = 24; 
-    this.life = 80;  
+// ====================
+// 敵
+// ====================
+
+function updateEnemies() {
+
+  for (let enemy of enemies) {
+
+    enemy.x += enemy.speed;
+
+    if (enemy.x &gt; width - 20 || enemy.x &lt; 20) {
+      enemy.speed *= -1;
+      enemy.y += 15;
+    }
+
+    fill(255, 60, 80);
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // ----------------
+    // 敵が弾を撃つ
+    // ----------------
+
+    enemy.shootTimer--;
+
+    if (enemy.shootTimer &lt;= 0) {
+
+      shootEnemyBullets(enemy);
+
+      // ウェーブが進むほど連射
+      enemy.shootTimer =
+        max(40, 150 - wave * 8) + random(20);
+    }
+
+    // 敵がプレイヤーに接触
+    if (
+      dist(
+        player.x,
+        player.y,
+        enemy.x,
+        enemy.y
+      ) &lt; 30
+    ) {
+      gameOver = true;
+    }
+
+    // 敵が下まで来た
+    if (enemy.y &gt; height - 50) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// 敵の弾を発射
+// ====================
+
+function shootEnemyBullets(enemy) {
+
+  // 敵から8方向に発射
+  let directions = [
+    0,
+    PI / 4,
+    PI / 2,
+    3 * PI / 4,
+    PI,
+    5 * PI / 4,
+    3 * PI / 2,
+    7 * PI / 4
+  ];
+
+  for (let angle of directions) {
+
+    let speed = 2.5 + wave * 0.15;
+
+    enemyBullets.push({
+      x: enemy.x,
+      y: enemy.y,
+
+      vx: cos(angle) * speed,
+      vy: sin(angle) * speed,
+
+      size: 8
+    });
+  }
+}
+
+// ====================
+// 敵の弾
+// ====================
+
+function updateEnemyBullets() {
+
+  fill(255, 100, 30);
+
+  for (
+    let i = enemyBullets.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let b = enemyBullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(
+      b.x,
+      b.y,
+      b.size
+    );
+
+    // 画面外
+    if (
+      b.x &lt; -30 ||
+      b.x &gt; width + 30 ||
+      b.y &lt; -30 ||
+      b.y &gt; height + 30
+    ) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // プレイヤーに当たった
+    let d = dist(
+      b.x,
+      b.y,
+      player.x,
+      player.y
+    );
+
+    if (d &lt; player.size / 2 + b.size / 2) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーの弾 vs 敵
+// ====================
+
+function checkPlayerBulletHits() {
+
+  for (
+    let i = enemies.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    for (
+      let j = bullets.length - 1;
+      j &gt;= 0;
+      j--
+    ) {
+
+      let b = bullets[j];
+
+      let d = dist(
+        b.x,
+        b.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (d &lt; enemy.size / 2 + 6) {
+
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+
+        score += 100;
+
+        break;
+      }
+    }
+  }
+}
+
+// ====================
+// 敵の弾 vs プレイヤー
+// ====================
+
+function checkEnemyBulletHits() {
+
+  // 念のためここでもチェック
+  for (let b of enemyBullets) {
+
+    if (
+      dist(
+        b.x,
+        b.y,
+        player.x,
+        player.y
+      ) &lt; 18
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーのショット
+// ====================
+
+function keyPressed() {
+
+  if (key === &#039; &#039;) {
+
+    // 真上
+    bullets.push({
+      x: player.x,
+      y: player.y - 25,
+      vx: 0,
+      vy: -10
+    });
+
+    // 左上
+    bullets.push({
+      x: player.x - 10,
+      y: player.y - 20,
+      vx: -3,
+      vy: -10
+    });
+
+    // 右上
+    bullets.push({
+      x: player.x + 10,
+      y: player.y - 20,
+      vx: 3,
+      vy: -10
+    });
   }
 
-  update() {
-    this.x += sin(this.angle) * this.speed;
-    this.y -= cos(this.angle) * this.speed;
-    this.life--;
+  // リスタート
+  if (key === &#039;r&#039; || key === &#039;R&#039;) {
+    restartGame();
   }
+}
 
-  display() {
-    push();
-    translate(this.x, this.y, this.z);
-    noStroke();
-    fill(255, 230, 120); 
-    sphere(2); 
-    pop();
-  }
+// ====================
+// ゲームオーバー
+// ====================
 
-  isExpired() { return this.life &lt;= 0; }
+function drawGameOver() {
+
+  fill(255, 50, 50);
+  textAlign(CENTER);
+
+  textSize(50);
+  text(
+    &quot;GAME OVER&quot;,
+    width / 2,
+    height / 2
+  );
+
+  fill(255);
+  textSize(20);
+
+  text(
+    &quot;SCORE: &quot; + score,
+    width / 2,
+    height / 2 + 45
+  );
+
+  text(
+    &quot;WAVE: &quot; + wave,
+    width / 2,
+    height / 2 + 75
+  );
+
+  text(
+    &quot;Rキーでリスタート&quot;,
+    width / 2,
+    height / 2 + 110
+  );
+
+  textAlign(LEFT);
+}
+
+// ====================
+// リスタート
+// ====================
+
+function restartGame() {
+
+  bullets = [];
+  enemyBullets = [];
+
+  score = 0;
+  wave = 1;
+  gameOver = false;
+
+  player.x = width / 2;
+  player.y = height - 60;
+
+  createWave();
 }</code></pre>
   </div>
 
