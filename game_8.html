@@ -2,21 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>田中太陽さんのゲーム</title>
+  <title>p5.js ゲーム作品</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
     body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
     h1 { font-size: 1.2rem; margin-bottom: 5px; }
     p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
     .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
+    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 回覧板に戻る</a>
-  <h1>田中太陽 (3年 番号:7)</h1>
+  <a href="index.html" class="back-link">← 一覧に戻る</a>
+  <h1>作者: 田中</h1>
   <p>tuiseki</p>
+  
   <script>// ==========================================
 // ハンターのマジック風 p5.js プロトタイプ
 // ==========================================
@@ -786,5 +791,782 @@ function restartGame() {
   gameState = "playing";
 }
 </script>
+
+  <div class="code-container">
+    <h3>ソースコード</h3>
+    <pre><code class="language-javascript">// ==========================================
+// ハンターのマジック風 p5.js プロトタイプ
+// ==========================================
+
+let player;
+let enemies = [];
+let bullets = [];
+let gems = [];
+
+let gameState = &quot;playing&quot;;
+
+let level = 1;
+let exp = 0;
+let expToNext = 10;
+
+let spawnTimer = 0;
+let score = 0;
+
+// 選択できるスキル
+let skills = [
+  {
+    name: &quot;火球強化&quot;,
+    description: &quot;魔法のダメージ +8&quot;,
+    apply: () =&gt; {
+      player.damage += 8;
+    }
+  },
+  {
+    name: &quot;高速詠唱&quot;,
+    description: &quot;攻撃速度アップ&quot;,
+    apply: () =&gt; {
+      player.attackInterval *= 0.75;
+    }
+  },
+  {
+    name: &quot;魔法弾追加&quot;,
+    description: &quot;同時に撃つ魔法が +1&quot;,
+    apply: () =&gt; {
+      player.multiShot++;
+    }
+  },
+  {
+    name: &quot;最大HPアップ&quot;,
+    description: &quot;最大HP +30、HP全回復&quot;,
+    apply: () =&gt; {
+      player.maxHp += 30;
+      player.hp = player.maxHp;
+    }
+  }
+];
+
+let skillChoices = [];
+
+// ==========================================
+// setup
+// ==========================================
+
+function setup() {
+  createCanvas(800, 600);
+
+  player = {
+    x: width / 2,
+    y: height / 2,
+
+    radius: 22,
+
+    hp: 100,
+    maxHp: 100,
+
+    damage: 15,
+
+    attackInterval: 45,
+    attackTimer: 0,
+
+    multiShot: 1,
+
+    speed: 3
+  };
+}
+
+// ==========================================
+// draw
+// ==========================================
+
+function draw() {
+  background(18, 20, 32);
+
+  if (gameState === &quot;playing&quot;) {
+    updateGame();
+    drawGame();
+    drawUI();
+  }
+
+  if (gameState === &quot;levelup&quot;) {
+    drawGame();
+    drawUI();
+    drawLevelUp();
+  }
+
+  if (gameState === &quot;gameover&quot;) {
+    drawGame();
+    drawUI();
+    drawGameOver();
+  }
+}
+
+// ==========================================
+// ゲーム更新
+// ==========================================
+
+function updateGame() {
+
+  // 敵を一定時間ごとに出す
+  spawnTimer++;
+
+  if (spawnTimer &gt; 45) {
+    spawnEnemy();
+    spawnTimer = 0;
+  }
+
+  // プレイヤーをマウスで移動
+  player.x = mouseX;
+  player.y = mouseY;
+
+  player.x = constrain(player.x, 30, width - 30);
+  player.y = constrain(player.y, 60, height - 30);
+
+  // 自動攻撃
+  player.attackTimer++;
+
+  if (player.attackTimer &gt;= player.attackInterval) {
+    shootMagic();
+    player.attackTimer = 0;
+  }
+
+  // 魔法弾更新
+  for (let i = bullets.length - 1; i &gt;= 0; i--) {
+
+    let b = bullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    b.life--;
+
+    // 敵との当たり判定
+    for (let j = enemies.length - 1; j &gt;= 0; j--) {
+
+      let e = enemies[j];
+
+      let d = dist(b.x, b.y, e.x, e.y);
+
+      if (d &lt; b.radius + e.radius) {
+
+        e.hp -= b.damage;
+
+        bullets.splice(i, 1);
+
+        // 敵を倒した
+        if (e.hp &lt;= 0) {
+
+          gems.push({
+            x: e.x,
+            y: e.y,
+            value: 1
+          });
+
+          enemies.splice(j, 1);
+
+          score += 10;
+        }
+
+        break;
+      }
+    }
+
+    if (i &lt; bullets.length &amp;&amp; b.life &lt;= 0) {
+      bullets.splice(i, 1);
+    }
+  }
+
+  // 経験値ジェム
+  for (let i = gems.length - 1; i &gt;= 0; i--) {
+
+    let g = gems[i];
+
+    let d = dist(player.x, player.y, g.x, g.y);
+
+    // プレイヤーに近づくと吸い寄せる
+    if (d &lt; 120) {
+
+      let angle = atan2(
+        player.y - g.y,
+        player.x - g.x
+      );
+
+      g.x += cos(angle) * 5;
+      g.y += sin(angle) * 5;
+    }
+
+    if (d &lt; player.radius + 10) {
+
+      exp += g.value;
+
+      gems.splice(i, 1);
+
+      checkLevelUp();
+    }
+  }
+
+  // 敵をプレイヤーへ移動
+  for (let e of enemies) {
+
+    let angle = atan2(
+      player.y - e.y,
+      player.x - e.x
+    );
+
+    e.x += cos(angle) * e.speed;
+    e.y += sin(angle) * e.speed;
+
+    // プレイヤーに接触
+    let d = dist(player.x, player.y, e.x, e.y);
+
+    if (d &lt; player.radius + e.radius) {
+
+      player.hp -= 0.5;
+
+      if (player.hp &lt;= 0) {
+        player.hp = 0;
+        gameState = &quot;gameover&quot;;
+      }
+    }
+  }
+}
+
+// ==========================================
+// 敵を生成
+// ==========================================
+
+function spawnEnemy() {
+
+  let side = floor(random(4));
+
+  let x;
+  let y;
+
+  if (side === 0) {
+    x = random(width);
+    y = -30;
+  }
+
+  if (side === 1) {
+    x = width + 30;
+    y = random(height);
+  }
+
+  if (side === 2) {
+    x = random(width);
+    y = height + 30;
+  }
+
+  if (side === 3) {
+    x = -30;
+    y = random(height);
+  }
+
+  enemies.push({
+    x: x,
+    y: y,
+
+    radius: 18,
+
+    hp: 30,
+    maxHp: 30,
+
+    speed: random(0.7, 1.4)
+  });
+}
+
+// ==========================================
+// 魔法を撃つ
+// ==========================================
+
+function shootMagic() {
+
+  if (enemies.length === 0) return;
+
+  // 一番近い敵を探す
+  let targets = [...enemies];
+
+  targets.sort((a, b) =&gt; {
+
+    let da = dist(player.x, player.y, a.x, a.y);
+    let db = dist(player.x, player.y, b.x, b.y);
+
+    return da - db;
+  });
+
+  let count = min(player.multiShot, targets.length);
+
+  for (let i = 0; i &lt; count; i++) {
+
+    let target = targets[i];
+
+    let angle = atan2(
+      target.y - player.y,
+      target.x - player.x
+    );
+
+    // 複数弾なら少し角度をずらす
+    if (count &gt; 1) {
+      angle += map(
+        i,
+        0,
+        count - 1,
+        -0.25,
+        0.25
+      );
+    }
+
+    bullets.push({
+      x: player.x,
+      y: player.y,
+
+      vx: cos(angle) * 8,
+      vy: sin(angle) * 8,
+
+      radius: 8,
+
+      damage: player.damage,
+
+      life: 100
+    });
+  }
+}
+
+// ==========================================
+// レベルアップ判定
+// ==========================================
+
+function checkLevelUp() {
+
+  if (exp &gt;= expToNext) {
+
+    exp -= expToNext;
+
+    level++;
+
+    expToNext = floor(expToNext * 1.35);
+
+    showLevelUp();
+  }
+}
+
+// ==========================================
+// レベルアップ画面
+// ==========================================
+
+function showLevelUp() {
+
+  gameState = &quot;levelup&quot;;
+
+  skillChoices = [];
+
+  // ランダムに3つ選ぶ
+  let pool = [...skills];
+
+  for (let i = 0; i &lt; 3; i++) {
+
+    let index = floor(random(pool.length));
+
+    skillChoices.push(pool[index]);
+
+    pool.splice(index, 1);
+  }
+}
+
+// ==========================================
+// 描画
+// ==========================================
+
+function drawGame() {
+
+  // 背景のグリッド
+  stroke(35, 38, 55);
+
+  for (let x = 0; x &lt; width; x += 40) {
+    line(x, 0, x, height);
+  }
+
+  for (let y = 0; y &lt; height; y += 40) {
+    line(0, y, width, y);
+  }
+
+  noStroke();
+
+  // 経験値ジェム
+  for (let g of gems) {
+
+    fill(80, 220, 255);
+
+    circle(g.x, g.y, 10);
+
+    fill(180, 250, 255);
+
+    circle(g.x - 2, g.y - 2, 3);
+  }
+
+  // 敵
+  for (let e of enemies) {
+
+    fill(210, 60, 70);
+
+    circle(e.x, e.y, e.radius * 2);
+
+    // 敵HPバー
+    fill(50);
+
+    rect(
+      e.x - 20,
+      e.y - 28,
+      40,
+      5
+    );
+
+    fill(80, 230, 100);
+
+    rect(
+      e.x - 20,
+      e.y - 28,
+      40 * (e.hp / e.maxHp),
+      5
+    );
+  }
+
+  // 魔法弾
+  for (let b of bullets) {
+
+    fill(255, 180, 40);
+
+    circle(b.x, b.y, b.radius * 2);
+
+    fill(255, 240, 120);
+
+    circle(b.x, b.y, 7);
+  }
+
+  // プレイヤー
+  drawPlayer();
+}
+
+// ==========================================
+// プレイヤー
+// ==========================================
+
+function drawPlayer() {
+
+  // 魔法陣
+  noFill();
+
+  stroke(80, 180, 255);
+  strokeWeight(2);
+
+  circle(
+    player.x,
+    player.y,
+    55
+  );
+
+  circle(
+    player.x,
+    player.y,
+    45
+  );
+
+  // 本体
+  noStroke();
+
+  fill(80, 130, 255);
+
+  circle(
+    player.x,
+    player.y,
+    player.radius * 2
+  );
+
+  fill(230);
+
+  circle(
+    player.x,
+    player.y - 5,
+    10
+  );
+}
+
+// ==========================================
+// UI
+// ==========================================
+
+function drawUI() {
+
+  // HP
+  fill(50);
+
+  rect(20, 20, 250, 18, 5);
+
+  fill(220, 60, 70);
+
+  rect(
+    20,
+    20,
+    250 * (player.hp / player.maxHp),
+    18,
+    5
+  );
+
+  fill(255);
+
+  textSize(14);
+
+  text(
+    &quot;HP &quot; + floor(player.hp) + &quot; / &quot; + player.maxHp,
+    30,
+    34
+  );
+
+  // EXP
+  fill(50);
+
+  rect(20, 45, 250, 10, 5);
+
+  fill(80, 220, 255);
+
+  rect(
+    20,
+    45,
+    250 * (exp / expToNext),
+    10,
+    5
+  );
+
+  fill(255);
+
+  textSize(18);
+
+  text(
+    &quot;Lv.&quot; + level,
+    290,
+    38
+  );
+
+  textSize(14);
+
+  text(
+    &quot;EXP &quot; + exp + &quot; / &quot; + expToNext,
+    290,
+    54
+  );
+
+  text(
+    &quot;Score: &quot; + score,
+    width - 130,
+    30
+  );
+
+  text(
+    &quot;マウスで移動&quot;,
+    width - 130,
+    52
+  );
+}
+
+// ==========================================
+// レベルアップ画面
+// ==========================================
+
+function drawLevelUp() {
+
+  fill(0, 0, 0, 180);
+
+  rect(0, 0, width, height);
+
+  textAlign(CENTER);
+
+  fill(255, 220, 80);
+
+  textSize(38);
+
+  text(
+    &quot;LEVEL UP!&quot;,
+    width / 2,
+    100
+  );
+
+  fill(255);
+
+  textSize(18);
+
+  text(
+    &quot;強化を1つ選んでください&quot;,
+    width / 2,
+    135
+  );
+
+  for (let i = 0; i &lt; 3; i++) {
+
+    let x = 130 + i * 270;
+
+    fill(35, 40, 65);
+
+    rect(
+      x - 100,
+      190,
+      200,
+      220,
+      15
+    );
+
+    fill(100, 180, 255);
+
+    rect(
+      x - 100,
+      190,
+      200,
+      8,
+      15
+    );
+
+    fill(255);
+
+    textSize(22);
+
+    text(
+      skillChoices[i].name,
+      x,
+      250
+    );
+
+    fill(190);
+
+    textSize(15);
+
+    text(
+      skillChoices[i].description,
+      x,
+      290
+    );
+
+    fill(100, 220, 255);
+
+    textSize(16);
+
+    text(
+      &quot;クリックして選択&quot;,
+      x,
+      370
+    );
+  }
+
+  textAlign(LEFT);
+}
+
+// ==========================================
+// クリック
+// ==========================================
+
+function mousePressed() {
+
+  if (gameState === &quot;levelup&quot;) {
+
+    for (let i = 0; i &lt; 3; i++) {
+
+      let x = 130 + i * 270;
+
+      if (
+        mouseX &gt; x - 100 &amp;&amp;
+        mouseX &lt; x + 100 &amp;&amp;
+        mouseY &gt; 190 &amp;&amp;
+        mouseY &lt; 410
+      ) {
+
+        skillChoices[i].apply();
+
+        gameState = &quot;playing&quot;;
+
+        break;
+      }
+    }
+  }
+
+  // ゲームオーバーならクリックでリスタート
+  else if (gameState === &quot;gameover&quot;) {
+
+    restartGame();
+  }
+}
+
+// ==========================================
+// ゲームオーバー
+// ==========================================
+
+function drawGameOver() {
+
+  fill(0, 0, 0, 190);
+
+  rect(0, 0, width, height);
+
+  textAlign(CENTER);
+
+  fill(255, 80, 80);
+
+  textSize(48);
+
+  text(
+    &quot;GAME OVER&quot;,
+    width / 2,
+    250
+  );
+
+  fill(255);
+
+  textSize(20);
+
+  text(
+    &quot;Score: &quot; + score,
+    width / 2,
+    300
+  );
+
+  text(
+    &quot;クリックでリスタート&quot;,
+    width / 2,
+    350
+  );
+
+  textAlign(LEFT);
+}
+
+// ==========================================
+// リスタート
+// ==========================================
+
+function restartGame() {
+
+  enemies = [];
+  bullets = [];
+  gems = [];
+
+  level = 1;
+  exp = 0;
+  expToNext = 10;
+
+  score = 0;
+
+  spawnTimer = 0;
+
+  player.hp = 100;
+  player.maxHp = 100;
+
+  player.damage = 15;
+
+  player.attackInterval = 45;
+
+  player.multiShot = 1;
+
+  gameState = &quot;playing&quot;;
+}
+</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>
