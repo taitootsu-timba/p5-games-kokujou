@@ -6,15 +6,92 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
-    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
-    h1 { font-size: 1.2rem; margin-bottom: 5px; }
-    p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
-    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
-    .back-link:hover { text-decoration: underline; }
-    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
-    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+    p {
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    #game-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    #game-container canvas {
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 4px;
+    }
+    .code-container {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      text-align: left;
+      background: #272822;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #1e1e1e;
+      margin: 0;
+      padding: 8px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-header span {
+      font-size: 0.85rem;
+      color: #888;
+      font-weight: bold;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .copy-btn:hover {
+      background: #333;
+      border-color: #666;
+      color: #fff;
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    pre {
+      margin: 0 !important;
+      padding: 15px !important;
+      font-size: 0.85rem;
+      max-height: 500px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -22,1688 +99,20 @@
   <h1>作者: 山下</h1>
   <p>障害物をよけるゲーム</p>
   
-  <script>let player;
-let obstacles = [];
-let coins = [];
+  <!-- ゲーム画面を配置する領域 -->
+  <div id="game-container"></div>
 
-let score = 0;
-let coinCount = 0;
-let speed = 7;
-
-let gameOver = false;
-let falling = false;
-
-let curve = 0;
-let targetCurve = 0;
-
-const ROAD_WIDTH = 480;
-const LANES = [-140, 0, 140];
-
-
-// ========================================
-// SETUP
-// ========================================
-
-function setup() {
-
-  createCanvas(720, 480, WEBGL);
-
-  let c = document.querySelector("canvas");
-
-  if (c) {
-    c.style.display = "block";
-    c.style.margin = "20px auto";
-    c.setAttribute("tabindex", "0");
-  }
-
-  player = {
-
-    lane: 1,
-
-    x: 0,
-    y: 0,
-    vy: 0,
-
-    jumping: false,
-
-    sliding: false,
-    slideTimer: 0,
-
-    fallY: 0,
-    fallRot: 0,
-
-    // キー入力ロック
-    leftLock: false,
-    rightLock: false,
-    jumpLock: false,
-    slideLock: false
-  };
-
-  resetObjects();
-
-  // キャンバスをクリックしたらフォーカス
-  if (c) {
-    c.addEventListener("click", function () {
-      c.focus();
-    });
-  }
-}
-
-
-// ========================================
-// OBJECTS
-// ========================================
-
-function resetObjects() {
-
-  obstacles = [];
-  coins = [];
-
-  obstacles.push(
-    new Obstacle(0, -650, "rock")
-  );
-
-  obstacles.push(
-    new Obstacle(2, -1000, "tree")
-  );
-
-  obstacles.push(
-    new Obstacle(1, -1400, "wall")
-  );
-
-  for (let i = 0; i < 8; i++) {
-
-    coins.push(
-      new Coin(
-        1,
-        -300 - i * 150
-      )
-    );
-  }
-}
-
-
-// ========================================
-// DRAW
-// ========================================
-
-let zoom = 0.7;
-
-function draw() {
-
-  background(220);
-
-  push();
-
-  // 画面を引く
-  scale(zoom);
-
-  if (!gameOver) {
-    updateGame();
-  }
-
-  // --------------------------------
-  // カメラ
-  // --------------------------------
-
-  let cameraX = curve * 0.10;
-  let cameraTilt = curve * 0.0008;
-
-  camera(
-
-    cameraX,
-    -170,
-    500,
-
-    cameraX,
-    -90,
-    -700,
-
-    sin(cameraTilt),
-    cos(cameraTilt),
-    0
-  );
-
-  ambientLight(120);
-
-  directionalLight(
-    255,
-    255,
-    220,
-    -1,
-    -1,
-    -1
-  );
-
-  drawWorld();
-
-  drawPlayer();
-
-  for (let obstacle of obstacles) {
-    obstacle.draw();
-  }
-
-  for (let coin of coins) {
-    coin.draw();
-  }
-
-  drawHUD();
-
-  if (gameOver) {
-    drawGameOver();
-  }
-
-  pop();
-}
-
-
-// ========================================
-// UPDATE
-// ========================================
-
-function updateGame() {
-
-  // ====================================
-  // KEY INPUT
-  // ====================================
-
-  if (!gameOver && !falling) {
-
-    // --------------------------------
-    // 左
-    // --------------------------------
-
-    if (keyIsDown(LEFT_ARROW)) {
-
-      if (!player.leftLock) {
-
-        player.lane = max(
-          0,
-          player.lane - 1
-        );
-
-        player.leftLock = true;
-      }
-
-    } else {
-
-      player.leftLock = false;
-    }
-
-
-    // --------------------------------
-    // 右
-    // --------------------------------
-
-    if (keyIsDown(RIGHT_ARROW)) {
-
-      if (!player.rightLock) {
-
-        player.lane = min(
-          2,
-          player.lane + 1
-        );
-
-        player.rightLock = true;
-      }
-
-    } else {
-
-      player.rightLock = false;
-    }
-
-
-    // --------------------------------
-    // A
-    // --------------------------------
-
-    if (keyIsDown(65)) {
-
-      if (!player.leftLock) {
-
-        player.lane = max(
-          0,
-          player.lane - 1
-        );
-
-        player.leftLock = true;
-      }
-
-    } else if (!keyIsDown(LEFT_ARROW)) {
-
-      player.leftLock = false;
-    }
-
-
-    // --------------------------------
-    // D
-    // --------------------------------
-
-    if (keyIsDown(68)) {
-
-      if (!player.rightLock) {
-
-        player.lane = min(
-          2,
-          player.lane + 1
-        );
-
-        player.rightLock = true;
-      }
-
-    } else if (!keyIsDown(RIGHT_ARROW)) {
-
-      player.rightLock = false;
-    }
-
-
-    // --------------------------------
-    // ジャンプ
-    // ↑ または SPACE
-    // --------------------------------
-
-    let jumpKey =
-      keyIsDown(UP_ARROW) ||
-      keyIsDown(32);
-
-
-    if (jumpKey) {
-
-      if (!player.jumpLock) {
-
-        if (
-          !player.jumping &&
-          !player.sliding
-        ) {
-
-          player.vy = -19;
-          player.jumping = true;
-        }
-
-        player.jumpLock = true;
-      }
-
-    } else {
-
-      player.jumpLock = false;
-    }
-
-
-    // --------------------------------
-    // スライド
-    // ↓ または S
-    // --------------------------------
-
-    let slideKey =
-      keyIsDown(DOWN_ARROW) ||
-      keyIsDown(83);
-
-
-    if (slideKey) {
-
-      if (!player.slideLock) {
-
-        if (!player.jumping) {
-
-          player.slideTimer = 35;
-          player.sliding = true;
-        }
-
-        player.slideLock = true;
-      }
-
-    } else {
-
-      player.slideLock = false;
-    }
-  }
-
-
-  // ====================================
-  // カーブ
-  // ====================================
-
-  curve = lerp(
-    curve,
-    targetCurve,
-    0.01
-  );
-
-  if (frameCount % 300 === 0) {
-
-    targetCurve = random(
-      -330,
-      330
-    );
-  }
-
-
-  // ====================================
-  // レーン移動
-  // ====================================
-
-  player.x = lerp(
-    player.x,
-    LANES[player.lane],
-    0.18
-  );
-
-
-  // ====================================
-  // ジャンプ
-  // ====================================
-
-  player.y += player.vy;
-
-  player.vy += 1;
-
-  if (player.y > 0) {
-
-    player.y = 0;
-    player.vy = 0;
-    player.jumping = false;
-  }
-
-
-  // ====================================
-  // スライド
-  // ====================================
-
-  if (player.slideTimer > 0) {
-
-    player.slideTimer--;
-
-    player.sliding = true;
-
-  } else {
-
-    player.sliding = false;
-  }
-
-
-  // ====================================
-  // 道の外
-  // ====================================
-
-  if (
-    abs(player.x) >
-    ROAD_WIDTH / 2 - 25
-  ) {
-
-    falling = true;
-  }
-
-
-  // ====================================
-  // 落下
-  // ====================================
-
-  if (falling) {
-
-    player.fallY += 7;
-    player.fallRot += 0.12;
-
-    if (player.fallY > 450) {
-
-      gameOver = true;
-    }
-
-    return;
-  }
-
-
-  // ====================================
-  // 障害物
-  // ====================================
-
-  for (let obstacle of obstacles) {
-
-    obstacle.z += speed;
-
-    obstacle.updateX();
-
-    if (obstacle.hit()) {
-
-      gameOver = true;
-    }
-  }
-
-
-  obstacles = obstacles.filter(
-    obstacle =>
-      obstacle.z < 650
-  );
-
-
-  // ====================================
-  // 新しい障害物
-  // ====================================
-
-  if (frameCount % 75 === 0) {
-
-    let lane =
-      floor(random(3));
-
-    let type =
-      random([
-        "rock",
-        "tree",
-        "wall"
-      ]);
-
-    obstacles.push(
-      new Obstacle(
-        lane,
-        -2300,
-        type
-      )
-    );
-  }
-
-
-  // ====================================
-  // コイン
-  // ====================================
-
-  for (let coin of coins) {
-
-    coin.z += speed;
-
-    coin.updateX();
-
-    coin.check();
-  }
-
-
-  coins = coins.filter(
-    coin =>
-      coin.z < 650 &&
-      !coin.collected
-  );
-
-
-  // ====================================
-  // 新しいコイン
-  // ====================================
-
-  if (frameCount % 40 === 0) {
-
-    coins.push(
-      new Coin(
-        floor(random(3)),
-        -1700
-      )
-    );
-  }
-
-
-  // ====================================
-  // スコア
-  // ====================================
-
-  score++;
-
-  speed += 0.002;
-}
-
-
-// ========================================
-// ROAD CURVE
-// ========================================
-
-function roadX(z) {
-
-  let distance =
-    constrain(
-      abs(z) / 2400,
-      0,
-      1
-    );
-
-  return curve * distance * 1.4;
-}
-
-
-// ========================================
-// WORLD
-// ========================================
-
-function drawWorld() {
-
-  // ====================================
-  // 道
-  // ====================================
-
-  let segments = 90;
-
-  let segmentLength =
-    4500 / segments;
-
-  for (
-    let i = 0;
-    i < segments;
-    i++
-  ) {
-
-    let z1 =
-      -i * segmentLength;
-
-    let z2 =
-      -(i + 1) * segmentLength;
-
-    let x1 =
-      roadX(z1);
-
-    let x2 =
-      roadX(z2);
-
-    let angle =
-      atan2(
-        x2 - x1,
-        segmentLength
-      );
-
-    push();
-
-    translate(
-      x1,
-      70,
-      z1
-    );
-
-    rotateY(angle);
-
-    fill(
-      150,
-      115,
-      70
-    );
-
-    box(
-      ROAD_WIDTH,
-      20,
-      segmentLength + 5
-    );
-
-    pop();
-  }
-
-
-  // ====================================
-  // レーンライン
-  // ====================================
-
-  for (
-    let laneX of [-70, 70]
-  ) {
-
-    push();
-
-    translate(
-      roadX(-1000) + laneX,
-      55,
-      -1000
-    );
-
-    fill(
-      230,
-      190,
-      100
-    );
-
-    box(
-      5,
-      4,
-      2600
-    );
-
-    pop();
-  }
-
-
-  // ====================================
-  // 草
-  // ====================================
-
-  for (
-    let i = 0;
-    i < 30;
-    i++
-  ) {
-
-    let z =
-      -i * 150;
-
-    let x =
-      roadX(z);
-
-    drawGrass(
-      x - 470,
-      z
-    );
-
-    drawGrass(
-      x + 470,
-      z
-    );
-  }
-
-
-  // ====================================
-  // 柱
-  // ====================================
-
-  for (
-    let z = -300;
-    z > -3500;
-    z -= 350
-  ) {
-
-    let x =
-      roadX(z);
-
-    drawPillar(
-      x - 390,
-      z
-    );
-
-    drawPillar(
-      x + 390,
-      z
-    );
-  }
-
-
-  // ====================================
-  // 山
-  // ====================================
-
-  for (
-    let x = -1000;
-    x <= 1000;
-    x += 300
-  ) {
-
-    push();
-
-    translate(
-      x,
-      -220,
-      -2800
-    );
-
-    fill(
-      50,
-      105,
-      60
-    );
-
-    cone(
-      180,
-      450
-    );
-
-    pop();
-  }
-}
-
-
-// ========================================
-// GRASS
-// ========================================
-
-function drawGrass(x, z) {
-
-  push();
-
-  translate(
-    x,
-    90,
-    z
-  );
-
-  fill(
-    60,
-    110,
-    50
-  );
-
-  box(
-    350,
-    30,
-    150
-  );
-
-  pop();
-}
-
-
-// ========================================
-// PILLAR
-// ========================================
-
-function drawPillar(x, z) {
-
-  push();
-
-  translate(
-    x,
-    -100,
-    z
-  );
-
-  fill(
-    125,
-    105,
-    75
-  );
-
-  box(
-    60,
-    380,
-    60
-  );
-
-  translate(
-    0,
-    -205,
-    0
-  );
-
-  fill(
-    165,
-    140,
-    90
-  );
-
-  box(
-    95,
-    35,
-    95
-  );
-
-  pop();
-}
-
-
-// ========================================
-// PLAYER
-// ========================================
-
-function drawPlayer() {
-
-  push();
-
-  let px =
-    roadX(350) +
-    player.x;
-
-
-  // ====================================
-  // 落下
-  // ====================================
-
-  if (falling) {
-
-    translate(
-      px,
-      30 + player.fallY,
-      350
-    );
-
-    rotateZ(
-      player.fallRot
-    );
-
-  } else {
-
-    translate(
-      px,
-      player.y - 40,
-      350
-    );
-  }
-
-
-  // ====================================
-  // スライド
-  // ====================================
-
-  if (
-    player.sliding &&
-    !falling
-  ) {
-
-    drawSlidingPlayer();
-
-    pop();
-
-    return;
-  }
-
-
-  drawRunningPlayer();
-
-  pop();
-}
-
-
-// ========================================
-// RUNNING PLAYER
-// ========================================
-
-function drawRunningPlayer() {
-
-  let run =
-    sin(
-      frameCount * 0.35
-    ) * 0.5;
-
-
-  // ====================================
-  // 体
-  // ====================================
-
-  push();
-
-  fill(
-    35,
-    100,
-    220
-  );
-
-  box(
-    42,
-    60,
-    32
-  );
-
-  pop();
-
-
-  // ====================================
-  // 頭
-  // ====================================
-
-  push();
-
-  translate(
-    0,
-    -50,
-    0
-  );
-
-  fill(
-    230,
-    170,
-    110
-  );
-
-  sphere(23);
-
-  pop();
-
-
-  // ====================================
-  // 左腕
-  // ====================================
-
-  push();
-
-  translate(
-    -29,
-    0,
-    0
-  );
-
-  rotateZ(run);
-
-  fill(
-    35,
-    100,
-    220
-  );
-
-  box(
-    14,
-    50,
-    14
-  );
-
-  pop();
-
-
-  // ====================================
-  // 右腕
-  // ====================================
-
-  push();
-
-  translate(
-    29,
-    0,
-    0
-  );
-
-  rotateZ(-run);
-
-  fill(
-    35,
-    100,
-    220
-  );
-
-  box(
-    14,
-    50,
-    14
-  );
-
-  pop();
-
-
-  // ====================================
-  // 左足
-  // ====================================
-
-  push();
-
-  translate(
-    -13,
-    50,
-    0
-  );
-
-  rotateZ(-run);
-
-  fill(
-    30,
-    40,
-    80
-  );
-
-  box(
-    17,
-    55,
-    19
-  );
-
-  pop();
-
-
-  // ====================================
-  // 右足
-  // ====================================
-
-  push();
-
-  translate(
-    13,
-    50,
-    0
-  );
-
-  rotateZ(run);
-
-  fill(
-    30,
-    40,
-    80
-  );
-
-  box(
-    17,
-    55,
-    19
-  );
-
-  pop();
-}
-
-
-// ========================================
-// SLIDE PLAYER
-// ========================================
-
-function drawSlidingPlayer() {
-
-  rotateZ(
-    HALF_PI
-  );
-
-  push();
-
-  fill(
-    35,
-    100,
-    220
-  );
-
-  box(
-    42,
-    60,
-    32
-  );
-
-  pop();
-
-
-  push();
-
-  translate(
-    0,
-    -45,
-    0
-  );
-
-  fill(
-    230,
-    170,
-    110
-  );
-
-  sphere(23);
-
-  pop();
-}
-
-
-// ========================================
-// OBSTACLE
-// ========================================
-
-class Obstacle {
-
-  constructor(
-    lane,
-    z,
-    type
-  ) {
-
-    this.lane = lane;
-
-    this.z = z;
-
-    this.type = type;
-
-    this.x =
-      LANES[lane];
-  }
-
-
-  updateX() {
-
-    this.x =
-      LANES[this.lane] +
-      roadX(this.z);
-  }
-
-
-  draw() {
-
-    push();
-
-    translate(
-      this.x,
-      0,
-      this.z
-    );
-
-
-    // ==================================
-    // 岩
-    // ==================================
-
-    if (
-      this.type === "rock"
-    ) {
-
-      translate(
-        0,
-        10,
-        0
-      );
-
-      fill(
-        90,
-        70,
-        55
-      );
-
-      sphere(55);
-
-
-      push();
-
-      translate(
-        40,
-        20,
-        20
-      );
-
-      fill(
-        110,
-        85,
-        60
-      );
-
-      sphere(23);
-
-      pop();
-    }
-
-
-    // ==================================
-    // 木
-    // ==================================
-
-    if (
-      this.type === "tree"
-    ) {
-
-      push();
-
-      translate(
-        0,
-        -80,
-        0
-      );
-
-      fill(
-        100,
-        60,
-        30
-      );
-
-      cylinder(
-        22,
-        170
-      );
-
-      pop();
-
-
-      push();
-
-      translate(
-        0,
-        -210,
-        0
-      );
-
-      fill(
-        30,
-        130,
-        45
-      );
-
-      sphere(85);
-
-      pop();
-    }
-
-
-    // ==================================
-    // 壁
-    // ==================================
-
-    if (
-      this.type === "wall"
-    ) {
-
-      translate(
-        0,
-        -55,
-        0
-      );
-
-      fill(
-        120,
-        90,
-        60
-      );
-
-      box(
-        160,
-        120,
-        45
-      );
-
-
-      push();
-
-      translate(
-        0,
-        0,
-        -25
-      );
-
-      fill(
-        160,
-        120,
-        75
-      );
-
-      box(
-        100,
-        12,
-        5
-      );
-
-      pop();
-    }
-
-    pop();
-  }
-
-
-  // ====================================
-  // HIT
-  // ====================================
-
-  hit() {
-
-    let closeZ =
-      abs(
-        this.z - 350
-      ) < 70;
-
-
-    let playerX =
-      roadX(350) +
-      player.x;
-
-
-    let closeX =
-      abs(
-        this.x - playerX
-      ) < 70;
-
-
-    if (
-      !closeZ ||
-      !closeX
-    ) {
-
-      return false;
-    }
-
-
-    // 岩
-    if (
-      this.type === "rock"
-    ) {
-
-      return (
-        player.y > -60
-      );
-    }
-
-
-    // 木
-    if (
-      this.type === "tree"
-    ) {
-
-      return true;
-    }
-
-
-    // 壁
-    if (
-      this.type === "wall"
-    ) {
-
-      return !player.sliding;
-    }
-
-
-    return false;
-  }
-}
-
-
-// ========================================
-// COIN
-// ========================================
-
-class Coin {
-
-  constructor(
-    lane,
-    z
-  ) {
-
-    this.lane = lane;
-
-    this.z = z;
-
-    this.x =
-      LANES[lane];
-
-    this.collected = false;
-  }
-
-
-  updateX() {
-
-    this.x =
-      LANES[this.lane] +
-      roadX(this.z);
-  }
-
-
-  draw() {
-
-    if (
-      this.collected
-    ) {
-
-      return;
-    }
-
-
-    push();
-
-    translate(
-      this.x,
-      -90,
-      this.z
-    );
-
-    rotateY(
-      frameCount * 0.1
-    );
-
-    fill(
-      255,
-      215,
-      0
-    );
-
-    torus(
-      22,
-      7
-    );
-
-    pop();
-  }
-
-
-  check() {
-
-    let closeZ =
-      abs(
-        this.z - 350
-      ) < 70;
-
-
-    let playerX =
-      roadX(350) +
-      player.x;
-
-
-    let closeX =
-      abs(
-        this.x - playerX
-      ) < 60;
-
-
-    let closeY =
-      abs(
-        -90 -
-        (player.y - 40)
-      ) < 90;
-
-
-    if (
-      closeZ &&
-      closeX &&
-      closeY
-    ) {
-
-      this.collected = true;
-
-      coinCount++;
-
-      score += 100;
-    }
-  }
-}
-
-
-// ========================================
-// HUD
-// ========================================
-
-function drawHUD() {
-
-  push();
-
-  resetMatrix();
-
-  translate(
-    -width / 2 + 18,
-    -height / 2 + 25
-  );
-
-  fill(255);
-
-  textSize(21);
-
-  text(
-    "SCORE: " + score,
-    0,
-    0
-  );
-
-  text(
-    "COINS: " + coinCount,
-    0,
-    28
-  );
-
-  textSize(13);
-
-  text(
-    "LEFT / RIGHT : MOVE",
-    0,
-    55
-  );
-
-  text(
-    "UP / SPACE : JUMP",
-    0,
-    75
-  );
-
-  text(
-    "DOWN / S : SLIDE",
-    0,
-    95
-  );
-
-  text(
-    "R : RESTART",
-    0,
-    115
-  );
-
-  pop();
-}
-
-
-// ========================================
-// GAME OVER
-// ========================================
-
-function drawGameOver() {
-
-  push();
-
-  resetMatrix();
-
-  translate(
-    -width / 2,
-    -height / 2
-  );
-
-  fill(
-    0,
-    0,
-    0,
-    180
-  );
-
-  rect(
-    0,
-    0,
-    width,
-    height
-  );
-
-
-  textAlign(
-    CENTER,
-    CENTER
-  );
-
-
-  fill(
-    255,
-    70,
-    50
-  );
-
-  textSize(50);
-
-
-  if (falling) {
-
-    text(
-      "YOU FELL!",
-      width / 2,
-      height / 2 - 40
-    );
-
-  } else {
-
-    text(
-      "GAME OVER",
-      width / 2,
-      height / 2 - 40
-    );
-  }
-
-
-  fill(255);
-
-  textSize(22);
-
-  text(
-    "SCORE: " + score,
-    width / 2,
-    height / 2 + 20
-  );
-
-  text(
-    "R : RESTART",
-    width / 2,
-    height / 2 + 55
-  );
-
-
-  pop();
-}
-
-
-// ========================================
-// R RESTART
-// ========================================
-
-function keyPressed() {
-
-  if (
-    key === "r" ||
-    key === "R"
-  ) {
-
-    if (gameOver) {
-      restart();
-    }
-
-    return false;
-  }
-
-
-  // ブラウザのデフォルト動作を停止
-  return false;
-}
-
-
-// ========================================
-// RESTART
-// ========================================
-
-function restart() {
-
-  player.lane = 1;
-
-  player.x = 0;
-
-  player.y = 0;
-
-  player.vy = 0;
-
-  player.jumping = false;
-
-  player.sliding = false;
-
-  player.slideTimer = 0;
-
-  player.fallY = 0;
-
-  player.fallRot = 0;
-
-  player.leftLock = false;
-
-  player.rightLock = false;
-
-  player.jumpLock = false;
-
-  player.slideLock = false;
-
-
-  score = 0;
-
-  coinCount = 0;
-
-  speed = 7;
-
-  curve = 0;
-
-  targetCurve = 0;
-
-  gameOver = false;
-
-  falling = false;
-
-  resetObjects();
-}
-
-
-// ========================================
-// RESIZE
-// ========================================
-
-function windowResized() {
-
-  // 固定サイズなので何もしない
-}</script>
-
+  <!-- ソースコード表示領域（ゲーム画面の下） -->
   <div class="code-container">
-    <h3>ソースコード</h3>
-    <pre><code class="language-javascript">let player;
+    <div class="code-header">
+      <span>ソースコード</span>
+      <button class="copy-btn" id="copy-btn" title="コードをコピー" aria-label="コードをコピー">
+        <svg id="copy-icon" viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+    </div>
+    <pre><code id="source-code" class="language-javascript">let player;
 let obstacles = [];
 let coins = [];
 
@@ -3386,5 +1795,1719 @@ function windowResized() {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+  <script>
+    // コピー機能の実装
+    const copyBtn = document.getElementById("copy-btn");
+    const copyIcon = document.getElementById("copy-icon");
+    const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+    const checkSvg = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+
+    copyBtn.addEventListener("click", function() {
+      const codeText = document.getElementById("source-code").textContent;
+      navigator.clipboard.writeText(codeText).then(function() {
+        copyIcon.innerHTML = checkSvg;
+        copyBtn.style.color = "#4fc3f7";
+        setTimeout(function() {
+          copyIcon.innerHTML = originalSvg;
+          copyBtn.style.color = "";
+        }, 2000);
+      });
+    });
+
+    // 生成されたキャンバスを #game-container の中に格納する
+    function ensureCanvasInContainer() {
+      const container = document.getElementById("game-container");
+      const canvas = document.querySelector("canvas");
+      if (canvas && canvas.parentElement !== container) {
+        container.appendChild(canvas);
+      }
+    }
+    const canvasObserver = new MutationObserver(function() {
+      ensureCanvasInContainer();
+    });
+    canvasObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("load", ensureCanvasInContainer);
+  </script>
+
+  <!-- 生徒のゲームスクリプト -->
+  <script>let player;
+let obstacles = [];
+let coins = [];
+
+let score = 0;
+let coinCount = 0;
+let speed = 7;
+
+let gameOver = false;
+let falling = false;
+
+let curve = 0;
+let targetCurve = 0;
+
+const ROAD_WIDTH = 480;
+const LANES = [-140, 0, 140];
+
+
+// ========================================
+// SETUP
+// ========================================
+
+function setup() {
+
+  createCanvas(720, 480, WEBGL);
+
+  let c = document.querySelector("canvas");
+
+  if (c) {
+    c.style.display = "block";
+    c.style.margin = "20px auto";
+    c.setAttribute("tabindex", "0");
+  }
+
+  player = {
+
+    lane: 1,
+
+    x: 0,
+    y: 0,
+    vy: 0,
+
+    jumping: false,
+
+    sliding: false,
+    slideTimer: 0,
+
+    fallY: 0,
+    fallRot: 0,
+
+    // キー入力ロック
+    leftLock: false,
+    rightLock: false,
+    jumpLock: false,
+    slideLock: false
+  };
+
+  resetObjects();
+
+  // キャンバスをクリックしたらフォーカス
+  if (c) {
+    c.addEventListener("click", function () {
+      c.focus();
+    });
+  }
+}
+
+
+// ========================================
+// OBJECTS
+// ========================================
+
+function resetObjects() {
+
+  obstacles = [];
+  coins = [];
+
+  obstacles.push(
+    new Obstacle(0, -650, "rock")
+  );
+
+  obstacles.push(
+    new Obstacle(2, -1000, "tree")
+  );
+
+  obstacles.push(
+    new Obstacle(1, -1400, "wall")
+  );
+
+  for (let i = 0; i < 8; i++) {
+
+    coins.push(
+      new Coin(
+        1,
+        -300 - i * 150
+      )
+    );
+  }
+}
+
+
+// ========================================
+// DRAW
+// ========================================
+
+let zoom = 0.7;
+
+function draw() {
+
+  background(220);
+
+  push();
+
+  // 画面を引く
+  scale(zoom);
+
+  if (!gameOver) {
+    updateGame();
+  }
+
+  // --------------------------------
+  // カメラ
+  // --------------------------------
+
+  let cameraX = curve * 0.10;
+  let cameraTilt = curve * 0.0008;
+
+  camera(
+
+    cameraX,
+    -170,
+    500,
+
+    cameraX,
+    -90,
+    -700,
+
+    sin(cameraTilt),
+    cos(cameraTilt),
+    0
+  );
+
+  ambientLight(120);
+
+  directionalLight(
+    255,
+    255,
+    220,
+    -1,
+    -1,
+    -1
+  );
+
+  drawWorld();
+
+  drawPlayer();
+
+  for (let obstacle of obstacles) {
+    obstacle.draw();
+  }
+
+  for (let coin of coins) {
+    coin.draw();
+  }
+
+  drawHUD();
+
+  if (gameOver) {
+    drawGameOver();
+  }
+
+  pop();
+}
+
+
+// ========================================
+// UPDATE
+// ========================================
+
+function updateGame() {
+
+  // ====================================
+  // KEY INPUT
+  // ====================================
+
+  if (!gameOver && !falling) {
+
+    // --------------------------------
+    // 左
+    // --------------------------------
+
+    if (keyIsDown(LEFT_ARROW)) {
+
+      if (!player.leftLock) {
+
+        player.lane = max(
+          0,
+          player.lane - 1
+        );
+
+        player.leftLock = true;
+      }
+
+    } else {
+
+      player.leftLock = false;
+    }
+
+
+    // --------------------------------
+    // 右
+    // --------------------------------
+
+    if (keyIsDown(RIGHT_ARROW)) {
+
+      if (!player.rightLock) {
+
+        player.lane = min(
+          2,
+          player.lane + 1
+        );
+
+        player.rightLock = true;
+      }
+
+    } else {
+
+      player.rightLock = false;
+    }
+
+
+    // --------------------------------
+    // A
+    // --------------------------------
+
+    if (keyIsDown(65)) {
+
+      if (!player.leftLock) {
+
+        player.lane = max(
+          0,
+          player.lane - 1
+        );
+
+        player.leftLock = true;
+      }
+
+    } else if (!keyIsDown(LEFT_ARROW)) {
+
+      player.leftLock = false;
+    }
+
+
+    // --------------------------------
+    // D
+    // --------------------------------
+
+    if (keyIsDown(68)) {
+
+      if (!player.rightLock) {
+
+        player.lane = min(
+          2,
+          player.lane + 1
+        );
+
+        player.rightLock = true;
+      }
+
+    } else if (!keyIsDown(RIGHT_ARROW)) {
+
+      player.rightLock = false;
+    }
+
+
+    // --------------------------------
+    // ジャンプ
+    // ↑ または SPACE
+    // --------------------------------
+
+    let jumpKey =
+      keyIsDown(UP_ARROW) ||
+      keyIsDown(32);
+
+
+    if (jumpKey) {
+
+      if (!player.jumpLock) {
+
+        if (
+          !player.jumping &&
+          !player.sliding
+        ) {
+
+          player.vy = -19;
+          player.jumping = true;
+        }
+
+        player.jumpLock = true;
+      }
+
+    } else {
+
+      player.jumpLock = false;
+    }
+
+
+    // --------------------------------
+    // スライド
+    // ↓ または S
+    // --------------------------------
+
+    let slideKey =
+      keyIsDown(DOWN_ARROW) ||
+      keyIsDown(83);
+
+
+    if (slideKey) {
+
+      if (!player.slideLock) {
+
+        if (!player.jumping) {
+
+          player.slideTimer = 35;
+          player.sliding = true;
+        }
+
+        player.slideLock = true;
+      }
+
+    } else {
+
+      player.slideLock = false;
+    }
+  }
+
+
+  // ====================================
+  // カーブ
+  // ====================================
+
+  curve = lerp(
+    curve,
+    targetCurve,
+    0.01
+  );
+
+  if (frameCount % 300 === 0) {
+
+    targetCurve = random(
+      -330,
+      330
+    );
+  }
+
+
+  // ====================================
+  // レーン移動
+  // ====================================
+
+  player.x = lerp(
+    player.x,
+    LANES[player.lane],
+    0.18
+  );
+
+
+  // ====================================
+  // ジャンプ
+  // ====================================
+
+  player.y += player.vy;
+
+  player.vy += 1;
+
+  if (player.y > 0) {
+
+    player.y = 0;
+    player.vy = 0;
+    player.jumping = false;
+  }
+
+
+  // ====================================
+  // スライド
+  // ====================================
+
+  if (player.slideTimer > 0) {
+
+    player.slideTimer--;
+
+    player.sliding = true;
+
+  } else {
+
+    player.sliding = false;
+  }
+
+
+  // ====================================
+  // 道の外
+  // ====================================
+
+  if (
+    abs(player.x) >
+    ROAD_WIDTH / 2 - 25
+  ) {
+
+    falling = true;
+  }
+
+
+  // ====================================
+  // 落下
+  // ====================================
+
+  if (falling) {
+
+    player.fallY += 7;
+    player.fallRot += 0.12;
+
+    if (player.fallY > 450) {
+
+      gameOver = true;
+    }
+
+    return;
+  }
+
+
+  // ====================================
+  // 障害物
+  // ====================================
+
+  for (let obstacle of obstacles) {
+
+    obstacle.z += speed;
+
+    obstacle.updateX();
+
+    if (obstacle.hit()) {
+
+      gameOver = true;
+    }
+  }
+
+
+  obstacles = obstacles.filter(
+    obstacle =>
+      obstacle.z < 650
+  );
+
+
+  // ====================================
+  // 新しい障害物
+  // ====================================
+
+  if (frameCount % 75 === 0) {
+
+    let lane =
+      floor(random(3));
+
+    let type =
+      random([
+        "rock",
+        "tree",
+        "wall"
+      ]);
+
+    obstacles.push(
+      new Obstacle(
+        lane,
+        -2300,
+        type
+      )
+    );
+  }
+
+
+  // ====================================
+  // コイン
+  // ====================================
+
+  for (let coin of coins) {
+
+    coin.z += speed;
+
+    coin.updateX();
+
+    coin.check();
+  }
+
+
+  coins = coins.filter(
+    coin =>
+      coin.z < 650 &&
+      !coin.collected
+  );
+
+
+  // ====================================
+  // 新しいコイン
+  // ====================================
+
+  if (frameCount % 40 === 0) {
+
+    coins.push(
+      new Coin(
+        floor(random(3)),
+        -1700
+      )
+    );
+  }
+
+
+  // ====================================
+  // スコア
+  // ====================================
+
+  score++;
+
+  speed += 0.002;
+}
+
+
+// ========================================
+// ROAD CURVE
+// ========================================
+
+function roadX(z) {
+
+  let distance =
+    constrain(
+      abs(z) / 2400,
+      0,
+      1
+    );
+
+  return curve * distance * 1.4;
+}
+
+
+// ========================================
+// WORLD
+// ========================================
+
+function drawWorld() {
+
+  // ====================================
+  // 道
+  // ====================================
+
+  let segments = 90;
+
+  let segmentLength =
+    4500 / segments;
+
+  for (
+    let i = 0;
+    i < segments;
+    i++
+  ) {
+
+    let z1 =
+      -i * segmentLength;
+
+    let z2 =
+      -(i + 1) * segmentLength;
+
+    let x1 =
+      roadX(z1);
+
+    let x2 =
+      roadX(z2);
+
+    let angle =
+      atan2(
+        x2 - x1,
+        segmentLength
+      );
+
+    push();
+
+    translate(
+      x1,
+      70,
+      z1
+    );
+
+    rotateY(angle);
+
+    fill(
+      150,
+      115,
+      70
+    );
+
+    box(
+      ROAD_WIDTH,
+      20,
+      segmentLength + 5
+    );
+
+    pop();
+  }
+
+
+  // ====================================
+  // レーンライン
+  // ====================================
+
+  for (
+    let laneX of [-70, 70]
+  ) {
+
+    push();
+
+    translate(
+      roadX(-1000) + laneX,
+      55,
+      -1000
+    );
+
+    fill(
+      230,
+      190,
+      100
+    );
+
+    box(
+      5,
+      4,
+      2600
+    );
+
+    pop();
+  }
+
+
+  // ====================================
+  // 草
+  // ====================================
+
+  for (
+    let i = 0;
+    i < 30;
+    i++
+  ) {
+
+    let z =
+      -i * 150;
+
+    let x =
+      roadX(z);
+
+    drawGrass(
+      x - 470,
+      z
+    );
+
+    drawGrass(
+      x + 470,
+      z
+    );
+  }
+
+
+  // ====================================
+  // 柱
+  // ====================================
+
+  for (
+    let z = -300;
+    z > -3500;
+    z -= 350
+  ) {
+
+    let x =
+      roadX(z);
+
+    drawPillar(
+      x - 390,
+      z
+    );
+
+    drawPillar(
+      x + 390,
+      z
+    );
+  }
+
+
+  // ====================================
+  // 山
+  // ====================================
+
+  for (
+    let x = -1000;
+    x <= 1000;
+    x += 300
+  ) {
+
+    push();
+
+    translate(
+      x,
+      -220,
+      -2800
+    );
+
+    fill(
+      50,
+      105,
+      60
+    );
+
+    cone(
+      180,
+      450
+    );
+
+    pop();
+  }
+}
+
+
+// ========================================
+// GRASS
+// ========================================
+
+function drawGrass(x, z) {
+
+  push();
+
+  translate(
+    x,
+    90,
+    z
+  );
+
+  fill(
+    60,
+    110,
+    50
+  );
+
+  box(
+    350,
+    30,
+    150
+  );
+
+  pop();
+}
+
+
+// ========================================
+// PILLAR
+// ========================================
+
+function drawPillar(x, z) {
+
+  push();
+
+  translate(
+    x,
+    -100,
+    z
+  );
+
+  fill(
+    125,
+    105,
+    75
+  );
+
+  box(
+    60,
+    380,
+    60
+  );
+
+  translate(
+    0,
+    -205,
+    0
+  );
+
+  fill(
+    165,
+    140,
+    90
+  );
+
+  box(
+    95,
+    35,
+    95
+  );
+
+  pop();
+}
+
+
+// ========================================
+// PLAYER
+// ========================================
+
+function drawPlayer() {
+
+  push();
+
+  let px =
+    roadX(350) +
+    player.x;
+
+
+  // ====================================
+  // 落下
+  // ====================================
+
+  if (falling) {
+
+    translate(
+      px,
+      30 + player.fallY,
+      350
+    );
+
+    rotateZ(
+      player.fallRot
+    );
+
+  } else {
+
+    translate(
+      px,
+      player.y - 40,
+      350
+    );
+  }
+
+
+  // ====================================
+  // スライド
+  // ====================================
+
+  if (
+    player.sliding &&
+    !falling
+  ) {
+
+    drawSlidingPlayer();
+
+    pop();
+
+    return;
+  }
+
+
+  drawRunningPlayer();
+
+  pop();
+}
+
+
+// ========================================
+// RUNNING PLAYER
+// ========================================
+
+function drawRunningPlayer() {
+
+  let run =
+    sin(
+      frameCount * 0.35
+    ) * 0.5;
+
+
+  // ====================================
+  // 体
+  // ====================================
+
+  push();
+
+  fill(
+    35,
+    100,
+    220
+  );
+
+  box(
+    42,
+    60,
+    32
+  );
+
+  pop();
+
+
+  // ====================================
+  // 頭
+  // ====================================
+
+  push();
+
+  translate(
+    0,
+    -50,
+    0
+  );
+
+  fill(
+    230,
+    170,
+    110
+  );
+
+  sphere(23);
+
+  pop();
+
+
+  // ====================================
+  // 左腕
+  // ====================================
+
+  push();
+
+  translate(
+    -29,
+    0,
+    0
+  );
+
+  rotateZ(run);
+
+  fill(
+    35,
+    100,
+    220
+  );
+
+  box(
+    14,
+    50,
+    14
+  );
+
+  pop();
+
+
+  // ====================================
+  // 右腕
+  // ====================================
+
+  push();
+
+  translate(
+    29,
+    0,
+    0
+  );
+
+  rotateZ(-run);
+
+  fill(
+    35,
+    100,
+    220
+  );
+
+  box(
+    14,
+    50,
+    14
+  );
+
+  pop();
+
+
+  // ====================================
+  // 左足
+  // ====================================
+
+  push();
+
+  translate(
+    -13,
+    50,
+    0
+  );
+
+  rotateZ(-run);
+
+  fill(
+    30,
+    40,
+    80
+  );
+
+  box(
+    17,
+    55,
+    19
+  );
+
+  pop();
+
+
+  // ====================================
+  // 右足
+  // ====================================
+
+  push();
+
+  translate(
+    13,
+    50,
+    0
+  );
+
+  rotateZ(run);
+
+  fill(
+    30,
+    40,
+    80
+  );
+
+  box(
+    17,
+    55,
+    19
+  );
+
+  pop();
+}
+
+
+// ========================================
+// SLIDE PLAYER
+// ========================================
+
+function drawSlidingPlayer() {
+
+  rotateZ(
+    HALF_PI
+  );
+
+  push();
+
+  fill(
+    35,
+    100,
+    220
+  );
+
+  box(
+    42,
+    60,
+    32
+  );
+
+  pop();
+
+
+  push();
+
+  translate(
+    0,
+    -45,
+    0
+  );
+
+  fill(
+    230,
+    170,
+    110
+  );
+
+  sphere(23);
+
+  pop();
+}
+
+
+// ========================================
+// OBSTACLE
+// ========================================
+
+class Obstacle {
+
+  constructor(
+    lane,
+    z,
+    type
+  ) {
+
+    this.lane = lane;
+
+    this.z = z;
+
+    this.type = type;
+
+    this.x =
+      LANES[lane];
+  }
+
+
+  updateX() {
+
+    this.x =
+      LANES[this.lane] +
+      roadX(this.z);
+  }
+
+
+  draw() {
+
+    push();
+
+    translate(
+      this.x,
+      0,
+      this.z
+    );
+
+
+    // ==================================
+    // 岩
+    // ==================================
+
+    if (
+      this.type === "rock"
+    ) {
+
+      translate(
+        0,
+        10,
+        0
+      );
+
+      fill(
+        90,
+        70,
+        55
+      );
+
+      sphere(55);
+
+
+      push();
+
+      translate(
+        40,
+        20,
+        20
+      );
+
+      fill(
+        110,
+        85,
+        60
+      );
+
+      sphere(23);
+
+      pop();
+    }
+
+
+    // ==================================
+    // 木
+    // ==================================
+
+    if (
+      this.type === "tree"
+    ) {
+
+      push();
+
+      translate(
+        0,
+        -80,
+        0
+      );
+
+      fill(
+        100,
+        60,
+        30
+      );
+
+      cylinder(
+        22,
+        170
+      );
+
+      pop();
+
+
+      push();
+
+      translate(
+        0,
+        -210,
+        0
+      );
+
+      fill(
+        30,
+        130,
+        45
+      );
+
+      sphere(85);
+
+      pop();
+    }
+
+
+    // ==================================
+    // 壁
+    // ==================================
+
+    if (
+      this.type === "wall"
+    ) {
+
+      translate(
+        0,
+        -55,
+        0
+      );
+
+      fill(
+        120,
+        90,
+        60
+      );
+
+      box(
+        160,
+        120,
+        45
+      );
+
+
+      push();
+
+      translate(
+        0,
+        0,
+        -25
+      );
+
+      fill(
+        160,
+        120,
+        75
+      );
+
+      box(
+        100,
+        12,
+        5
+      );
+
+      pop();
+    }
+
+    pop();
+  }
+
+
+  // ====================================
+  // HIT
+  // ====================================
+
+  hit() {
+
+    let closeZ =
+      abs(
+        this.z - 350
+      ) < 70;
+
+
+    let playerX =
+      roadX(350) +
+      player.x;
+
+
+    let closeX =
+      abs(
+        this.x - playerX
+      ) < 70;
+
+
+    if (
+      !closeZ ||
+      !closeX
+    ) {
+
+      return false;
+    }
+
+
+    // 岩
+    if (
+      this.type === "rock"
+    ) {
+
+      return (
+        player.y > -60
+      );
+    }
+
+
+    // 木
+    if (
+      this.type === "tree"
+    ) {
+
+      return true;
+    }
+
+
+    // 壁
+    if (
+      this.type === "wall"
+    ) {
+
+      return !player.sliding;
+    }
+
+
+    return false;
+  }
+}
+
+
+// ========================================
+// COIN
+// ========================================
+
+class Coin {
+
+  constructor(
+    lane,
+    z
+  ) {
+
+    this.lane = lane;
+
+    this.z = z;
+
+    this.x =
+      LANES[lane];
+
+    this.collected = false;
+  }
+
+
+  updateX() {
+
+    this.x =
+      LANES[this.lane] +
+      roadX(this.z);
+  }
+
+
+  draw() {
+
+    if (
+      this.collected
+    ) {
+
+      return;
+    }
+
+
+    push();
+
+    translate(
+      this.x,
+      -90,
+      this.z
+    );
+
+    rotateY(
+      frameCount * 0.1
+    );
+
+    fill(
+      255,
+      215,
+      0
+    );
+
+    torus(
+      22,
+      7
+    );
+
+    pop();
+  }
+
+
+  check() {
+
+    let closeZ =
+      abs(
+        this.z - 350
+      ) < 70;
+
+
+    let playerX =
+      roadX(350) +
+      player.x;
+
+
+    let closeX =
+      abs(
+        this.x - playerX
+      ) < 60;
+
+
+    let closeY =
+      abs(
+        -90 -
+        (player.y - 40)
+      ) < 90;
+
+
+    if (
+      closeZ &&
+      closeX &&
+      closeY
+    ) {
+
+      this.collected = true;
+
+      coinCount++;
+
+      score += 100;
+    }
+  }
+}
+
+
+// ========================================
+// HUD
+// ========================================
+
+function drawHUD() {
+
+  push();
+
+  resetMatrix();
+
+  translate(
+    -width / 2 + 18,
+    -height / 2 + 25
+  );
+
+  fill(255);
+
+  textSize(21);
+
+  text(
+    "SCORE: " + score,
+    0,
+    0
+  );
+
+  text(
+    "COINS: " + coinCount,
+    0,
+    28
+  );
+
+  textSize(13);
+
+  text(
+    "LEFT / RIGHT : MOVE",
+    0,
+    55
+  );
+
+  text(
+    "UP / SPACE : JUMP",
+    0,
+    75
+  );
+
+  text(
+    "DOWN / S : SLIDE",
+    0,
+    95
+  );
+
+  text(
+    "R : RESTART",
+    0,
+    115
+  );
+
+  pop();
+}
+
+
+// ========================================
+// GAME OVER
+// ========================================
+
+function drawGameOver() {
+
+  push();
+
+  resetMatrix();
+
+  translate(
+    -width / 2,
+    -height / 2
+  );
+
+  fill(
+    0,
+    0,
+    0,
+    180
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+
+  fill(
+    255,
+    70,
+    50
+  );
+
+  textSize(50);
+
+
+  if (falling) {
+
+    text(
+      "YOU FELL!",
+      width / 2,
+      height / 2 - 40
+    );
+
+  } else {
+
+    text(
+      "GAME OVER",
+      width / 2,
+      height / 2 - 40
+    );
+  }
+
+
+  fill(255);
+
+  textSize(22);
+
+  text(
+    "SCORE: " + score,
+    width / 2,
+    height / 2 + 20
+  );
+
+  text(
+    "R : RESTART",
+    width / 2,
+    height / 2 + 55
+  );
+
+
+  pop();
+}
+
+
+// ========================================
+// R RESTART
+// ========================================
+
+function keyPressed() {
+
+  if (
+    key === "r" ||
+    key === "R"
+  ) {
+
+    if (gameOver) {
+      restart();
+    }
+
+    return false;
+  }
+
+
+  // ブラウザのデフォルト動作を停止
+  return false;
+}
+
+
+// ========================================
+// RESTART
+// ========================================
+
+function restart() {
+
+  player.lane = 1;
+
+  player.x = 0;
+
+  player.y = 0;
+
+  player.vy = 0;
+
+  player.jumping = false;
+
+  player.sliding = false;
+
+  player.slideTimer = 0;
+
+  player.fallY = 0;
+
+  player.fallRot = 0;
+
+  player.leftLock = false;
+
+  player.rightLock = false;
+
+  player.jumpLock = false;
+
+  player.slideLock = false;
+
+
+  score = 0;
+
+  coinCount = 0;
+
+  speed = 7;
+
+  curve = 0;
+
+  targetCurve = 0;
+
+  gameOver = false;
+
+  falling = false;
+
+  resetObjects();
+}
+
+
+// ========================================
+// RESIZE
+// ========================================
+
+function windowResized() {
+
+  // 固定サイズなので何もしない
+}</script>
 </body>
 </html>
