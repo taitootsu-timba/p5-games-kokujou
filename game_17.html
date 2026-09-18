@@ -109,8 +109,8 @@
   <!-- 1. ヘッダー情報 -->
   <div class="header-group">
     <a href="index.html" class="back-link">← 一覧に戻る</a>
-    <h1>作者: 斉藤</h1>
-    <p>マリオみたいなやつ</p>
+    <h1>作者: 門田</h1>
+    <p>迷路</p>
   </div>
 
   <!-- 2. ゲーム画面コンテナ（必ずコード枠の上） -->
@@ -126,7 +126,663 @@
         </svg>
       </button>
     </div>
-    <pre><code id="source-code" class="language-javascript">https://editor.p5js.org/?version=2.3.3</code></pre>
+    <pre><code id="source-code" class="language-javascript">// ============================================================
+// 3D FPS MAZE
+// p5.js
+// ============================================================
+
+
+// ============================================================
+// MAZE
+// ============================================================
+
+const maze = [
+  &quot;###############&quot;,
+  &quot;#P            #&quot;,
+  &quot;# ##### ##### #&quot;,
+  &quot;#     #       #&quot;,
+  &quot;##### # #######&quot;,
+  &quot;#     #       #&quot;,
+  &quot;# ### ##### # #&quot;,
+  &quot;# #         # #&quot;,
+  &quot;# # ####### # #&quot;,
+  &quot;# #       #   #&quot;,
+  &quot;# ####### #####&quot;,
+  &quot;#             #&quot;,
+  &quot;###############&quot;
+];
+
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+const CELL_SIZE = 80;
+const WALL_HEIGHT = 120;
+
+const PLAYER_HEIGHT = 45;
+const PLAYER_RADIUS = 18;
+
+const MOVE_SPEED = 4;
+
+const MOUSE_SENSITIVITY = 0.003;
+
+
+// ============================================================
+// PLAYER
+// ============================================================
+
+let playerX = 0;
+let playerZ = 0;
+
+let playerAngle = 0;
+
+
+// ============================================================
+// KEYBOARD
+// ============================================================
+
+let keys = {
+  w: false,
+  a: false,
+  s: false,
+  d: false
+};
+
+
+// ============================================================
+// WALLS
+// ============================================================
+
+let walls = [];
+
+
+// ============================================================
+// SETUP
+// ============================================================
+
+function setup() {
+
+  createCanvas(
+    windowWidth,
+    windowHeight,
+    WEBGL
+  );
+
+  createMaze();
+
+  noStroke();
+
+  // ブラウザのキーイベント
+  window.addEventListener(
+    &quot;keydown&quot;,
+    handleKeyDown
+  );
+
+  window.addEventListener(
+    &quot;keyup&quot;,
+    handleKeyUp
+  );
+
+  // ウィンドウから離れたら停止
+  window.addEventListener(
+    &quot;blur&quot;,
+    releaseAllKeys
+  );
+
+}
+
+
+// ============================================================
+// KEY DOWN
+// ============================================================
+
+function handleKeyDown(event) {
+
+  if (event.code === &quot;KeyW&quot;) {
+    keys.w = true;
+  }
+
+  if (event.code === &quot;KeyA&quot;) {
+    keys.a = true;
+  }
+
+  if (event.code === &quot;KeyS&quot;) {
+    keys.s = true;
+  }
+
+  if (event.code === &quot;KeyD&quot;) {
+    keys.d = true;
+  }
+
+}
+
+
+// ============================================================
+// KEY UP
+// ============================================================
+
+function handleKeyUp(event) {
+
+  if (event.code === &quot;KeyW&quot;) {
+    keys.w = false;
+  }
+
+  if (event.code === &quot;KeyA&quot;) {
+    keys.a = false;
+  }
+
+  if (event.code === &quot;KeyS&quot;) {
+    keys.s = false;
+  }
+
+  if (event.code === &quot;KeyD&quot;) {
+    keys.d = false;
+  }
+
+}
+
+
+// ============================================================
+// RELEASE ALL KEYS
+// ============================================================
+
+function releaseAllKeys() {
+
+  keys.w = false;
+  keys.a = false;
+  keys.s = false;
+  keys.d = false;
+
+}
+
+
+// ============================================================
+// CREATE MAZE
+// ============================================================
+
+function createMaze() {
+
+  const mazeWidth =
+    maze[0].length;
+
+  const mazeHeight =
+    maze.length;
+
+
+  const offsetX =
+    mazeWidth * CELL_SIZE / 2;
+
+  const offsetZ =
+    mazeHeight * CELL_SIZE / 2;
+
+
+  for (
+    let row = 0;
+    row &lt; mazeHeight;
+    row++
+  ) {
+
+    for (
+      let col = 0;
+      col &lt; maze[row].length;
+      col++
+    ) {
+
+      const tile =
+        maze[row][col];
+
+
+      const x =
+        col * CELL_SIZE
+        - offsetX
+        + CELL_SIZE / 2;
+
+
+      const z =
+        row * CELL_SIZE
+        - offsetZ
+        + CELL_SIZE / 2;
+
+
+      if (tile === &quot;#&quot;) {
+
+        walls.push({
+          x: x,
+          z: z
+        });
+
+      }
+
+
+      if (tile === &quot;P&quot;) {
+
+        playerX = x;
+        playerZ = z;
+
+      }
+
+    }
+
+  }
+
+}
+
+
+// ============================================================
+// DRAW
+// ============================================================
+
+function draw() {
+
+  background(
+    30,
+    35,
+    45
+  );
+
+
+  updatePlayer();
+
+  updateCamera();
+
+
+  // Lighting
+
+  ambientLight(100);
+
+  directionalLight(
+    255,
+    255,
+    255,
+    -0.5,
+    -1,
+    -0.5
+  );
+
+
+  drawFloor();
+
+  drawWalls();
+
+}
+
+
+// ============================================================
+// PLAYER UPDATE
+// ============================================================
+
+function updatePlayer() {
+
+  let forward = 0;
+  let strafe = 0;
+
+
+  // ------------------------------
+  // Forward
+  // ------------------------------
+
+  if (keys.w) {
+    forward += 1;
+  }
+
+  if (keys.s) {
+    forward -= 1;
+  }
+
+
+  // ------------------------------
+  // Strafe
+  // ------------------------------
+
+  if (keys.a) {
+    strafe -= 1;
+  }
+
+  if (keys.d) {
+    strafe += 1;
+  }
+
+
+  // ------------------------------
+  // Stop
+  // ------------------------------
+
+  if (
+    forward === 0 &amp;&amp;
+    strafe === 0
+  ) {
+
+    return;
+
+  }
+
+
+  // ------------------------------
+  // Direction
+  // ------------------------------
+
+  let dx =
+    sin(playerAngle) *
+    forward;
+
+  let dz =
+    -cos(playerAngle) *
+    forward;
+
+
+  // ------------------------------
+  // Strafe
+  // ------------------------------
+
+  dx +=
+    cos(playerAngle) *
+    strafe;
+
+  dz +=
+    sin(playerAngle) *
+    strafe;
+
+
+  // ------------------------------
+  // Normalize
+  // ------------------------------
+
+  const length =
+    sqrt(
+      dx * dx +
+      dz * dz
+    );
+
+
+  if (length === 0) {
+    return;
+  }
+
+
+  dx /= length;
+  dz /= length;
+
+
+  // ------------------------------
+  // Speed
+  // ------------------------------
+
+  dx *= MOVE_SPEED;
+  dz *= MOVE_SPEED;
+
+
+  // ------------------------------
+  // Collision
+  // ------------------------------
+
+  const nextX =
+    playerX + dx;
+
+
+  if (
+    !isColliding(
+      nextX,
+      playerZ
+    )
+  ) {
+
+    playerX = nextX;
+
+  }
+
+
+  const nextZ =
+    playerZ + dz;
+
+
+  if (
+    !isColliding(
+      playerX,
+      nextZ
+    )
+  ) {
+
+    playerZ = nextZ;
+
+  }
+
+}
+
+
+// ============================================================
+// COLLISION
+// ============================================================
+
+function isColliding(
+  x,
+  z
+) {
+
+  for (
+    const wall of walls
+  ) {
+
+    const closestX =
+      constrain(
+        x,
+        wall.x - CELL_SIZE / 2,
+        wall.x + CELL_SIZE / 2
+      );
+
+
+    const closestZ =
+      constrain(
+        z,
+        wall.z - CELL_SIZE / 2,
+        wall.z + CELL_SIZE / 2
+      );
+
+
+    const distance =
+      dist(
+        x,
+        z,
+        closestX,
+        closestZ
+      );
+
+
+    if (
+      distance &lt; PLAYER_RADIUS
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+// ============================================================
+// CAMERA
+// ============================================================
+
+function updateCamera() {
+
+  const lookDistance = 100;
+
+
+  const lookX =
+    playerX +
+    sin(playerAngle) *
+    lookDistance;
+
+
+  const lookZ =
+    playerZ -
+    cos(playerAngle) *
+    lookDistance;
+
+
+  camera(
+
+    playerX,
+    -PLAYER_HEIGHT,
+    playerZ,
+
+    lookX,
+    -PLAYER_HEIGHT,
+    lookZ,
+
+    0,
+    1,
+    0
+
+  );
+
+}
+
+
+// ============================================================
+// FLOOR
+// ============================================================
+
+function drawFloor() {
+
+  push();
+
+  translate(
+    0,
+    20,
+    0
+  );
+
+  rotateX(
+    HALF_PI
+  );
+
+  ambientMaterial(
+    50,
+    55,
+    60
+  );
+
+  plane(
+    3000,
+    3000
+  );
+
+  pop();
+
+}
+
+
+// ============================================================
+// WALLS
+// ============================================================
+
+function drawWalls() {
+
+  for (
+    const wall of walls
+  ) {
+
+    push();
+
+    translate(
+      wall.x,
+      -30,
+      wall.z
+    );
+
+    ambientMaterial(
+      120,
+      130,
+      145
+    );
+
+    box(
+      CELL_SIZE,
+      WALL_HEIGHT,
+      CELL_SIZE
+    );
+
+    pop();
+
+  }
+
+}
+
+
+// ============================================================
+// MOUSE
+// ============================================================
+
+function mousePressed() {
+
+  if (
+    !document.pointerLockElement
+  ) {
+
+    requestPointerLock();
+
+  }
+
+}
+
+
+function mouseMoved() {
+
+  if (
+    document.pointerLockElement
+  ) {
+
+    playerAngle +=
+      movedX *
+      MOUSE_SENSITIVITY;
+
+  }
+
+}
+
+
+// ============================================================
+// POINTER LOCK CHANGE
+// ============================================================
+
+document.addEventListener(
+  &quot;pointerlockchange&quot;,
+  function() {
+
+    // Pointer Lockが解除されたら
+    // 移動キーを全部リセット
+
+    if (
+      !document.pointerLockElement
+    ) {
+
+      releaseAllKeys();
+
+    }
+
+  }
+);
+
+
+// ============================================================
+// WINDOW RESIZE
+// ============================================================
+
+function windowResized() {
+
+  resizeCanvas(
+    windowWidth,
+    windowHeight
+  );
+
+}
+</code></pre>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
@@ -163,7 +819,6 @@
       });
     }
 
-    // DOM変更を常時監視して、キャンバスがbody直下に作られた瞬間に即移動
     const observer = new MutationObserver(relocateCanvas);
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("DOMContentLoaded", relocateCanvas);
@@ -172,7 +827,6 @@
 
   <!-- 4. 生徒のスクリプト実行 -->
   <script>
-    // 生徒が定義する setup の完了時にも即座にキャンバス格納を実行するフック
     window.addEventListener('load', () => {
       if (typeof window.setup === 'function') {
         const originalSetup = window.setup;
@@ -183,6 +837,662 @@
       }
     });
   </script>
-  <script>https://editor.p5js.org/?version=2.3.3</script>
+  <script>// ============================================================
+// 3D FPS MAZE
+// p5.js
+// ============================================================
+
+
+// ============================================================
+// MAZE
+// ============================================================
+
+const maze = [
+  "###############",
+  "#P            #",
+  "# ##### ##### #",
+  "#     #       #",
+  "##### # #######",
+  "#     #       #",
+  "# ### ##### # #",
+  "# #         # #",
+  "# # ####### # #",
+  "# #       #   #",
+  "# ####### #####",
+  "#             #",
+  "###############"
+];
+
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+const CELL_SIZE = 80;
+const WALL_HEIGHT = 120;
+
+const PLAYER_HEIGHT = 45;
+const PLAYER_RADIUS = 18;
+
+const MOVE_SPEED = 4;
+
+const MOUSE_SENSITIVITY = 0.003;
+
+
+// ============================================================
+// PLAYER
+// ============================================================
+
+let playerX = 0;
+let playerZ = 0;
+
+let playerAngle = 0;
+
+
+// ============================================================
+// KEYBOARD
+// ============================================================
+
+let keys = {
+  w: false,
+  a: false,
+  s: false,
+  d: false
+};
+
+
+// ============================================================
+// WALLS
+// ============================================================
+
+let walls = [];
+
+
+// ============================================================
+// SETUP
+// ============================================================
+
+function setup() {
+
+  createCanvas(
+    windowWidth,
+    windowHeight,
+    WEBGL
+  );
+
+  createMaze();
+
+  noStroke();
+
+  // ブラウザのキーイベント
+  window.addEventListener(
+    "keydown",
+    handleKeyDown
+  );
+
+  window.addEventListener(
+    "keyup",
+    handleKeyUp
+  );
+
+  // ウィンドウから離れたら停止
+  window.addEventListener(
+    "blur",
+    releaseAllKeys
+  );
+
+}
+
+
+// ============================================================
+// KEY DOWN
+// ============================================================
+
+function handleKeyDown(event) {
+
+  if (event.code === "KeyW") {
+    keys.w = true;
+  }
+
+  if (event.code === "KeyA") {
+    keys.a = true;
+  }
+
+  if (event.code === "KeyS") {
+    keys.s = true;
+  }
+
+  if (event.code === "KeyD") {
+    keys.d = true;
+  }
+
+}
+
+
+// ============================================================
+// KEY UP
+// ============================================================
+
+function handleKeyUp(event) {
+
+  if (event.code === "KeyW") {
+    keys.w = false;
+  }
+
+  if (event.code === "KeyA") {
+    keys.a = false;
+  }
+
+  if (event.code === "KeyS") {
+    keys.s = false;
+  }
+
+  if (event.code === "KeyD") {
+    keys.d = false;
+  }
+
+}
+
+
+// ============================================================
+// RELEASE ALL KEYS
+// ============================================================
+
+function releaseAllKeys() {
+
+  keys.w = false;
+  keys.a = false;
+  keys.s = false;
+  keys.d = false;
+
+}
+
+
+// ============================================================
+// CREATE MAZE
+// ============================================================
+
+function createMaze() {
+
+  const mazeWidth =
+    maze[0].length;
+
+  const mazeHeight =
+    maze.length;
+
+
+  const offsetX =
+    mazeWidth * CELL_SIZE / 2;
+
+  const offsetZ =
+    mazeHeight * CELL_SIZE / 2;
+
+
+  for (
+    let row = 0;
+    row < mazeHeight;
+    row++
+  ) {
+
+    for (
+      let col = 0;
+      col < maze[row].length;
+      col++
+    ) {
+
+      const tile =
+        maze[row][col];
+
+
+      const x =
+        col * CELL_SIZE
+        - offsetX
+        + CELL_SIZE / 2;
+
+
+      const z =
+        row * CELL_SIZE
+        - offsetZ
+        + CELL_SIZE / 2;
+
+
+      if (tile === "#") {
+
+        walls.push({
+          x: x,
+          z: z
+        });
+
+      }
+
+
+      if (tile === "P") {
+
+        playerX = x;
+        playerZ = z;
+
+      }
+
+    }
+
+  }
+
+}
+
+
+// ============================================================
+// DRAW
+// ============================================================
+
+function draw() {
+
+  background(
+    30,
+    35,
+    45
+  );
+
+
+  updatePlayer();
+
+  updateCamera();
+
+
+  // Lighting
+
+  ambientLight(100);
+
+  directionalLight(
+    255,
+    255,
+    255,
+    -0.5,
+    -1,
+    -0.5
+  );
+
+
+  drawFloor();
+
+  drawWalls();
+
+}
+
+
+// ============================================================
+// PLAYER UPDATE
+// ============================================================
+
+function updatePlayer() {
+
+  let forward = 0;
+  let strafe = 0;
+
+
+  // ------------------------------
+  // Forward
+  // ------------------------------
+
+  if (keys.w) {
+    forward += 1;
+  }
+
+  if (keys.s) {
+    forward -= 1;
+  }
+
+
+  // ------------------------------
+  // Strafe
+  // ------------------------------
+
+  if (keys.a) {
+    strafe -= 1;
+  }
+
+  if (keys.d) {
+    strafe += 1;
+  }
+
+
+  // ------------------------------
+  // Stop
+  // ------------------------------
+
+  if (
+    forward === 0 &&
+    strafe === 0
+  ) {
+
+    return;
+
+  }
+
+
+  // ------------------------------
+  // Direction
+  // ------------------------------
+
+  let dx =
+    sin(playerAngle) *
+    forward;
+
+  let dz =
+    -cos(playerAngle) *
+    forward;
+
+
+  // ------------------------------
+  // Strafe
+  // ------------------------------
+
+  dx +=
+    cos(playerAngle) *
+    strafe;
+
+  dz +=
+    sin(playerAngle) *
+    strafe;
+
+
+  // ------------------------------
+  // Normalize
+  // ------------------------------
+
+  const length =
+    sqrt(
+      dx * dx +
+      dz * dz
+    );
+
+
+  if (length === 0) {
+    return;
+  }
+
+
+  dx /= length;
+  dz /= length;
+
+
+  // ------------------------------
+  // Speed
+  // ------------------------------
+
+  dx *= MOVE_SPEED;
+  dz *= MOVE_SPEED;
+
+
+  // ------------------------------
+  // Collision
+  // ------------------------------
+
+  const nextX =
+    playerX + dx;
+
+
+  if (
+    !isColliding(
+      nextX,
+      playerZ
+    )
+  ) {
+
+    playerX = nextX;
+
+  }
+
+
+  const nextZ =
+    playerZ + dz;
+
+
+  if (
+    !isColliding(
+      playerX,
+      nextZ
+    )
+  ) {
+
+    playerZ = nextZ;
+
+  }
+
+}
+
+
+// ============================================================
+// COLLISION
+// ============================================================
+
+function isColliding(
+  x,
+  z
+) {
+
+  for (
+    const wall of walls
+  ) {
+
+    const closestX =
+      constrain(
+        x,
+        wall.x - CELL_SIZE / 2,
+        wall.x + CELL_SIZE / 2
+      );
+
+
+    const closestZ =
+      constrain(
+        z,
+        wall.z - CELL_SIZE / 2,
+        wall.z + CELL_SIZE / 2
+      );
+
+
+    const distance =
+      dist(
+        x,
+        z,
+        closestX,
+        closestZ
+      );
+
+
+    if (
+      distance < PLAYER_RADIUS
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+
+  return false;
+
+}
+
+
+// ============================================================
+// CAMERA
+// ============================================================
+
+function updateCamera() {
+
+  const lookDistance = 100;
+
+
+  const lookX =
+    playerX +
+    sin(playerAngle) *
+    lookDistance;
+
+
+  const lookZ =
+    playerZ -
+    cos(playerAngle) *
+    lookDistance;
+
+
+  camera(
+
+    playerX,
+    -PLAYER_HEIGHT,
+    playerZ,
+
+    lookX,
+    -PLAYER_HEIGHT,
+    lookZ,
+
+    0,
+    1,
+    0
+
+  );
+
+}
+
+
+// ============================================================
+// FLOOR
+// ============================================================
+
+function drawFloor() {
+
+  push();
+
+  translate(
+    0,
+    20,
+    0
+  );
+
+  rotateX(
+    HALF_PI
+  );
+
+  ambientMaterial(
+    50,
+    55,
+    60
+  );
+
+  plane(
+    3000,
+    3000
+  );
+
+  pop();
+
+}
+
+
+// ============================================================
+// WALLS
+// ============================================================
+
+function drawWalls() {
+
+  for (
+    const wall of walls
+  ) {
+
+    push();
+
+    translate(
+      wall.x,
+      -30,
+      wall.z
+    );
+
+    ambientMaterial(
+      120,
+      130,
+      145
+    );
+
+    box(
+      CELL_SIZE,
+      WALL_HEIGHT,
+      CELL_SIZE
+    );
+
+    pop();
+
+  }
+
+}
+
+
+// ============================================================
+// MOUSE
+// ============================================================
+
+function mousePressed() {
+
+  if (
+    !document.pointerLockElement
+  ) {
+
+    requestPointerLock();
+
+  }
+
+}
+
+
+function mouseMoved() {
+
+  if (
+    document.pointerLockElement
+  ) {
+
+    playerAngle +=
+      movedX *
+      MOUSE_SENSITIVITY;
+
+  }
+
+}
+
+
+// ============================================================
+// POINTER LOCK CHANGE
+// ============================================================
+
+document.addEventListener(
+  "pointerlockchange",
+  function() {
+
+    // Pointer Lockが解除されたら
+    // 移動キーを全部リセット
+
+    if (
+      !document.pointerLockElement
+    ) {
+
+      releaseAllKeys();
+
+    }
+
+  }
+);
+
+
+// ============================================================
+// WINDOW RESIZE
+// ============================================================
+
+function windowResized() {
+
+  resizeCanvas(
+    windowWidth,
+    windowHeight
+  );
+
+}
+</script>
 </body>
 </html>
