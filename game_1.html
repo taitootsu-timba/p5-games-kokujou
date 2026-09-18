@@ -2,21 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>小名川滉斗さんのゲーム</title>
+  <title>p5.js ゲーム作品</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
     body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
     h1 { font-size: 1.2rem; margin-bottom: 5px; }
     p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
     .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
+    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 回覧板に戻る</a>
-  <h1>小名川滉斗 (3年 番号:4)</h1>
+  <a href="index.html" class="back-link">← 一覧に戻る</a>
+  <h1>作者: 小名</h1>
   <p>Slither</p>
+  
   <script>const WORLD_SIZE = 5000;
 const FOOD_COUNT = 650;
 const ENEMY_COUNT = 12;
@@ -1304,5 +1309,1300 @@ function windowResized() {
     windowHeight
   );
 }</script>
+
+  <div class="code-container">
+    <h3>ソースコード</h3>
+    <pre><code class="language-javascript">const WORLD_SIZE = 5000;
+const FOOD_COUNT = 650;
+const ENEMY_COUNT = 12;
+
+let player;
+let foods = [];
+let enemies = [];
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+
+  player = new Snake(
+    0,
+    0,
+    color(50, 230, 100),
+    true
+  );
+
+  for (let i = 0; i &lt; FOOD_COUNT; i++) {
+    spawnFood();
+  }
+
+  for (let i = 0; i &lt; ENEMY_COUNT; i++) {
+    spawnEnemy();
+  }
+}
+
+function draw() {
+  background(13, 15, 21);
+
+  if (!player.dead) {
+    player.update();
+  }
+
+  for (let enemy of enemies) {
+    if (!enemy.dead) {
+      enemy.update();
+    }
+  }
+
+  checkCollisions();
+
+  push();
+
+  translate(
+    width / 2 - player.x,
+    height / 2 - player.y
+  );
+
+  drawWorld();
+
+  for (let food of foods) {
+    food.show();
+  }
+
+  for (let enemy of enemies) {
+    if (!enemy.dead) {
+      enemy.show();
+    }
+  }
+
+  player.show();
+
+  pop();
+
+  drawUI();
+
+  // 死んだ敵を削除
+  for (let i = enemies.length - 1; i &gt;= 0; i--) {
+    if (enemies[i].dead) {
+      enemies.splice(i, 1);
+    }
+  }
+
+  // 敵を補充
+  while (enemies.length &lt; ENEMY_COUNT) {
+    spawnEnemy();
+  }
+}
+
+// =================================================
+// WORLD
+// =================================================
+
+function drawWorld() {
+  const half = WORLD_SIZE / 2;
+
+  stroke(27, 30, 38);
+  strokeWeight(1);
+
+  for (let x = -half; x &lt;= half; x += 100) {
+    line(x, -half, x, half);
+  }
+
+  for (let y = -half; y &lt;= half; y += 100) {
+    line(-half, y, half, y);
+  }
+
+  noFill();
+  stroke(90, 100, 120);
+  strokeWeight(8);
+
+  rect(
+    -half,
+    -half,
+    WORLD_SIZE,
+    WORLD_SIZE
+  );
+}
+
+// =================================================
+// COLLISION
+// =================================================
+
+function checkCollisions() {
+  if (player.dead) return;
+
+  // -----------------------------------------------
+  // プレイヤーの頭 VS 敵の体
+  // -----------------------------------------------
+
+  for (let enemy of enemies) {
+    if (enemy.dead) continue;
+
+    for (let i = 7; i &lt; enemy.body.length; i++) {
+      const p = enemy.body[i];
+
+      const d = dist(
+        player.x,
+        player.y,
+        p.x,
+        p.y
+      );
+
+      if (
+        d &lt;
+        player.radius +
+        enemy.radius * 0.75
+      ) {
+        player.die();
+        return;
+      }
+    }
+  }
+
+  // -----------------------------------------------
+  // 敵の頭 VS プレイヤーの体
+  // -----------------------------------------------
+
+  for (let enemy of enemies) {
+    if (enemy.dead) continue;
+
+    for (let i = 8; i &lt; player.body.length; i++) {
+      const p = player.body[i];
+
+      const d = dist(
+        enemy.x,
+        enemy.y,
+        p.x,
+        p.y
+      );
+
+      if (
+        d &lt;
+        enemy.radius +
+        player.radius * 0.75
+      ) {
+        enemy.die();
+        break;
+      }
+    }
+  }
+
+  // -----------------------------------------------
+  // 頭 VS 頭
+  // -----------------------------------------------
+
+  for (let enemy of enemies) {
+    if (enemy.dead) continue;
+
+    const d = dist(
+      player.x,
+      player.y,
+      enemy.x,
+      enemy.y
+    );
+
+    if (
+      d &lt;
+      player.radius +
+      enemy.radius
+    ) {
+      if (
+        player.body.length &gt;=
+        enemy.body.length
+      ) {
+        enemy.die();
+      } else {
+        player.die();
+        return;
+      }
+    }
+  }
+
+  // -----------------------------------------------
+  // 敵同士の衝突
+  // -----------------------------------------------
+
+  for (let i = 0; i &lt; enemies.length; i++) {
+    const a = enemies[i];
+
+    if (a.dead) continue;
+
+    for (let j = i + 1; j &lt; enemies.length; j++) {
+      const b = enemies[j];
+
+      if (b.dead) continue;
+
+      // Aの頭 VS Bの体
+      if (
+        headHitsBody(a, b)
+      ) {
+        a.die();
+      }
+
+      // Bの頭 VS Aの体
+      if (
+        headHitsBody(b, a)
+      ) {
+        b.die();
+      }
+    }
+  }
+}
+
+function headHitsBody(head, bodySnake) {
+  for (
+    let i = 7;
+    i &lt; bodySnake.body.length;
+    i++
+  ) {
+    const p = bodySnake.body[i];
+
+    const d = dist(
+      head.x,
+      head.y,
+      p.x,
+      p.y
+    );
+
+    if (
+      d &lt;
+      head.radius +
+      bodySnake.radius * 0.75
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// =================================================
+// FOOD
+// =================================================
+
+class Food {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.r = random(4, 9);
+
+    this.col = color(
+      random(80, 255),
+      random(80, 255),
+      random(80, 255)
+    );
+  }
+
+  show() {
+    noStroke();
+
+    fill(
+      red(this.col),
+      green(this.col),
+      blue(this.col),
+      40
+    );
+
+    circle(
+      this.x,
+      this.y,
+      this.r * 4
+    );
+
+    fill(this.col);
+
+    circle(
+      this.x,
+      this.y,
+      this.r * 2
+    );
+  }
+}
+
+// =================================================
+// SNAKE
+// =================================================
+
+class Snake {
+  constructor(x, y, col, isPlayer) {
+    this.x = x;
+    this.y = y;
+
+    this.col = col;
+    this.isPlayer = isPlayer;
+
+    this.angle = random(TWO_PI);
+
+    this.radius = 13;
+
+    this.normalSpeed =
+      isPlayer ? 3.0 : random(2.6, 3.2);
+
+    this.boostSpeed =
+      isPlayer ? 6.2 : 4.2;
+
+    this.speed = this.normalSpeed;
+
+    this.targetLength =
+      isPlayer
+        ? 40
+        : floor(random(35, 100));
+
+    this.boostEnergy = 1;
+
+    this.dead = false;
+
+    this.aiTimer = random(30, 100);
+
+    this.body = [];
+
+    for (
+      let i = 0;
+      i &lt; this.targetLength;
+      i++
+    ) {
+      this.body.push({
+        x:
+          this.x -
+          cos(this.angle) * i * 7,
+
+        y:
+          this.y -
+          sin(this.angle) * i * 7
+      });
+    }
+  }
+
+  // =================================================
+  // UPDATE
+  // =================================================
+
+  update() {
+    if (this.dead) return;
+
+    if (this.isPlayer) {
+      this.updatePlayer();
+    } else {
+      this.updateAI();
+    }
+
+    // 移動
+    this.x +=
+      cos(this.angle) *
+      this.speed;
+
+    this.y +=
+      sin(this.angle) *
+      this.speed;
+
+    // 頭を追加
+    this.body.unshift({
+      x: this.x,
+      y: this.y
+    });
+
+    // 体を切る
+    while (
+      this.body.length &gt;
+      this.targetLength
+    ) {
+      this.body.pop();
+    }
+
+    // 壁
+    const half =
+      WORLD_SIZE / 2 - 30;
+
+    if (
+      this.x &lt; -half ||
+      this.x &gt; half ||
+      this.y &lt; -half ||
+      this.y &gt; half
+    ) {
+      this.die();
+      return;
+    }
+
+    this.eatFood();
+  }
+
+  // =================================================
+  // PLAYER
+  // =================================================
+
+  updatePlayer() {
+    const targetAngle = atan2(
+      mouseY - height / 2,
+      mouseX - width / 2
+    );
+
+    const diff =
+      angleDifference(
+        targetAngle,
+        this.angle
+      );
+
+    this.angle +=
+      diff * 0.13;
+
+    const boosting =
+      mouseIsPressed ||
+      keyIsDown(32);
+
+    if (
+      boosting &amp;&amp;
+      this.boostEnergy &gt; 0.01 &amp;&amp;
+      this.targetLength &gt; 20
+    ) {
+      this.speed =
+        this.boostSpeed;
+
+      this.boostEnergy -= 0.004;
+
+      // ブースト中は体を消費
+      if (frameCount % 5 === 0) {
+        this.targetLength--;
+
+        if (this.body.length &gt; 5) {
+          const tail =
+            this.body[
+              this.body.length - 1
+            ];
+
+          foods.push(
+            new Food(
+              tail.x + random(-6, 6),
+              tail.y + random(-6, 6)
+            )
+          );
+        }
+      }
+    } else {
+      this.speed =
+        this.normalSpeed;
+
+      this.boostEnergy +=
+        0.0025;
+    }
+
+    this.boostEnergy =
+      constrain(
+        this.boostEnergy,
+        0,
+        1
+      );
+  }
+
+  // =================================================
+  // 強化AI
+  // =================================================
+
+  updateAI() {
+    let closestDistance =
+      Infinity;
+
+    let closestX =
+      this.x;
+
+    let closestY =
+      this.y;
+
+    // -----------------------------------------------
+    // プレイヤーとの距離
+    // -----------------------------------------------
+
+    let playerDistance =
+      dist(
+        this.x,
+        this.y,
+        player.x,
+        player.y
+      );
+
+    // プレイヤーの未来位置を予測
+    let prediction =
+      constrain(
+        playerDistance / 50,
+        4,
+        16
+      );
+
+    let predictedX =
+      player.x +
+      cos(player.angle) *
+      player.speed *
+      prediction;
+
+    let predictedY =
+      player.y +
+      sin(player.angle) *
+      player.speed *
+      prediction;
+
+    // -----------------------------------------------
+    // 基本AI
+    // -----------------------------------------------
+
+    if (
+      playerDistance &lt; 1400 &amp;&amp;
+      !player.dead
+    ) {
+      closestX =
+        predictedX;
+
+      closestY =
+        predictedY;
+
+      closestDistance =
+        playerDistance;
+    }
+
+    // -----------------------------------------------
+    // プレイヤーを横から挟む
+    // -----------------------------------------------
+
+    if (
+      playerDistance &lt; 800 &amp;&amp;
+      playerDistance &gt; 200 &amp;&amp;
+      !player.dead
+    ) {
+      const side =
+        sin(
+          player.angle -
+          this.angle
+        );
+
+      const sideDirection =
+        side &gt;= 0
+          ? 1
+          : -1;
+
+      const surroundAngle =
+        player.angle +
+        HALF_PI *
+        sideDirection;
+
+      closestX =
+        player.x +
+        cos(surroundAngle) *
+        220;
+
+      closestY =
+        player.y +
+        sin(surroundAngle) *
+        220;
+    }
+
+    // -----------------------------------------------
+    // プレイヤーの体を狙う
+    // -----------------------------------------------
+
+    if (
+      playerDistance &lt; 650 &amp;&amp;
+      !player.dead
+    ) {
+      let index =
+        floor(
+          map(
+            playerDistance,
+            0,
+            650,
+            12,
+            min(
+              player.body.length - 1,
+              60
+            )
+          )
+        );
+
+      index =
+        constrain(
+          index,
+          8,
+          player.body.length - 1
+        );
+
+      const p =
+        player.body[index];
+
+      if (p) {
+        closestX =
+          p.x;
+
+        closestY =
+          p.y;
+      }
+    }
+
+    // -----------------------------------------------
+    // 他の敵を避ける
+    // -----------------------------------------------
+
+    for (let other of enemies) {
+      if (
+        other === this ||
+        other.dead
+      ) {
+        continue;
+      }
+
+      const d =
+        dist(
+          this.x,
+          this.y,
+          other.x,
+          other.y
+        );
+
+      if (d &lt; 260) {
+        // 相手が大きいなら逃げる
+        if (
+          other.body.length &gt;
+          this.body.length * 1.15
+        ) {
+          const escape =
+            atan2(
+              this.y - other.y,
+              this.x - other.x
+            );
+
+          const diff =
+            angleDifference(
+              escape,
+              this.angle
+            );
+
+          this.angle +=
+            diff * 0.1;
+        }
+      }
+    }
+
+    // -----------------------------------------------
+    // ターゲットへ曲がる
+    // -----------------------------------------------
+
+    if (
+      closestDistance &lt;
+      Infinity
+    ) {
+      const target =
+        atan2(
+          closestY - this.y,
+          closestX - this.x
+        );
+
+      const diff =
+        angleDifference(
+          target,
+          this.angle
+        );
+
+      let turnPower =
+        0.035;
+
+      if (
+        playerDistance &lt; 700
+      ) {
+        turnPower =
+          0.06;
+      }
+
+      if (
+        playerDistance &lt; 350
+      ) {
+        turnPower =
+          0.10;
+      }
+
+      this.angle +=
+        diff * turnPower;
+    } else {
+      // プレイヤーが遠いときも
+      // ランダムに動く
+      this.aiTimer--;
+
+      if (this.aiTimer &lt;= 0) {
+        this.angle +=
+          random(-0.8, 0.8);
+
+        this.aiTimer =
+          random(40, 140);
+      }
+    }
+
+    // -----------------------------------------------
+    // 壁回避
+    // -----------------------------------------------
+
+    const margin = 400;
+
+    if (
+      this.x &lt;
+      -WORLD_SIZE / 2 +
+      margin
+    ) {
+      this.angle =
+        lerpAngle(
+          this.angle,
+          0,
+          0.10
+        );
+    }
+
+    if (
+      this.x &gt;
+      WORLD_SIZE / 2 -
+      margin
+    ) {
+      this.angle =
+        lerpAngle(
+          this.angle,
+          PI,
+          0.10
+        );
+    }
+
+    if (
+      this.y &lt;
+      -WORLD_SIZE / 2 +
+      margin
+    ) {
+      this.angle =
+        lerpAngle(
+          this.angle,
+          HALF_PI,
+          0.10
+        );
+    }
+
+    if (
+      this.y &gt;
+      WORLD_SIZE / 2 -
+      margin
+    ) {
+      this.angle =
+        lerpAngle(
+          this.angle,
+          -HALF_PI,
+          0.10
+        );
+    }
+
+    // -----------------------------------------------
+    // 接近時は加速
+    // -----------------------------------------------
+
+    if (
+      playerDistance &lt; 550 &amp;&amp;
+      !player.dead &amp;&amp;
+      this.targetLength &gt; 25
+    ) {
+      this.speed =
+        this.boostSpeed;
+
+      // 敵も少し体を消費
+      if (
+        frameCount % 7 === 0
+      ) {
+        this.targetLength--;
+
+        if (
+          this.body.length &gt; 10
+        ) {
+          const tail =
+            this.body[
+              this.body.length - 1
+            ];
+
+          foods.push(
+            new Food(
+              tail.x,
+              tail.y
+            )
+          );
+        }
+      }
+    } else {
+      this.speed =
+        this.normalSpeed;
+    }
+  }
+
+  // =================================================
+  // FOOD
+  // =================================================
+
+  eatFood() {
+    for (
+      let i = foods.length - 1;
+      i &gt;= 0;
+      i--
+    ) {
+      const food =
+        foods[i];
+
+      const d =
+        dist(
+          this.x,
+          this.y,
+          food.x,
+          food.y
+        );
+
+      if (
+        d &lt;
+        this.radius +
+        food.r
+      ) {
+        this.targetLength += 2;
+
+        foods.splice(i, 1);
+
+        spawnFood();
+      }
+    }
+  }
+
+  // =================================================
+  // DRAW
+  // =================================================
+
+  show() {
+    noStroke();
+
+    // 体
+    for (
+      let i =
+        this.body.length - 1;
+      i &gt;= 0;
+      i--
+    ) {
+      const p =
+        this.body[i];
+
+      let size =
+        this.radius * 2;
+
+      const ratio =
+        i / this.body.length;
+
+      size *=
+        1 -
+        ratio * 0.18;
+
+      fill(this.col);
+
+      circle(
+        p.x,
+        p.y,
+        size
+      );
+    }
+
+    // 頭
+    fill(this.col);
+
+    circle(
+      this.x,
+      this.y,
+      this.radius * 2.2
+    );
+
+    this.drawEyes();
+  }
+
+  // =================================================
+  // EYES
+  // =================================================
+
+  drawEyes() {
+    const fx =
+      cos(this.angle);
+
+    const fy =
+      sin(this.angle);
+
+    const sx =
+      -fy;
+
+    const sy =
+      fx;
+
+    const eyeDistance = 6;
+
+    const x1 =
+      this.x +
+      fx * 5 +
+      sx * eyeDistance;
+
+    const y1 =
+      this.y +
+      fy * 5 +
+      sy * eyeDistance;
+
+    const x2 =
+      this.x +
+      fx * 5 -
+      sx * eyeDistance;
+
+    const y2 =
+      this.y +
+      fy * 5 -
+      sy * eyeDistance;
+
+    fill(255);
+
+    circle(
+      x1,
+      y1,
+      9
+    );
+
+    circle(
+      x2,
+      y2,
+      9
+    );
+
+    fill(20);
+
+    circle(
+      x1 + fx * 2,
+      y1 + fy * 2,
+      4
+    );
+
+    circle(
+      x2 + fx * 2,
+      y2 + fy * 2,
+      4
+    );
+  }
+
+  // =================================================
+  // DIE
+  // =================================================
+
+  die() {
+    if (this.dead) return;
+
+    this.dead = true;
+
+    // プレイヤー
+    if (this.isPlayer) {
+      return;
+    }
+
+    // 敵の体をエサにする
+    for (
+      let i = 0;
+      i &lt; this.body.length;
+      i += 3
+    ) {
+      const p =
+        this.body[i];
+
+      foods.push(
+        new Food(
+          p.x + random(-8, 8),
+          p.y + random(-8, 8)
+        )
+      );
+    }
+  }
+}
+
+// =================================================
+// SPAWN FOOD
+// =================================================
+
+function spawnFood() {
+  foods.push(
+    new Food(
+      random(
+        -WORLD_SIZE / 2 + 50,
+        WORLD_SIZE / 2 - 50
+      ),
+      random(
+        -WORLD_SIZE / 2 + 50,
+        WORLD_SIZE / 2 - 50
+      )
+    )
+  );
+}
+
+// =================================================
+// SPAWN ENEMY
+// =================================================
+
+function spawnEnemy() {
+  let x;
+  let y;
+
+  do {
+    x =
+      random(
+        -WORLD_SIZE / 2 + 300,
+        WORLD_SIZE / 2 - 300
+      );
+
+    y =
+      random(
+        -WORLD_SIZE / 2 + 300,
+        WORLD_SIZE / 2 - 300
+      );
+  } while (
+    dist(
+      x,
+      y,
+      player.x,
+      player.y
+    ) &lt; 700
+  );
+
+  const col =
+    color(
+      random(60, 255),
+      random(60, 255),
+      random(60, 255)
+    );
+
+  enemies.push(
+    new Snake(
+      x,
+      y,
+      col,
+      false
+    )
+  );
+}
+
+// =================================================
+// ANGLE
+// =================================================
+
+function angleDifference(a, b) {
+  let d = a - b;
+
+  while (d &gt; PI) {
+    d -= TWO_PI;
+  }
+
+  while (d &lt; -PI) {
+    d += TWO_PI;
+  }
+
+  return d;
+}
+
+function lerpAngle(a, b, amount) {
+  return (
+    a +
+    angleDifference(b, a) *
+    amount
+  );
+}
+
+// =================================================
+// RESTART
+// =================================================
+
+function mousePressed() {
+  if (player.dead) {
+    restartGame();
+  }
+}
+
+function keyPressed() {
+  if (
+    player.dead &amp;&amp;
+    keyCode === ENTER
+  ) {
+    restartGame();
+  }
+}
+
+function restartGame() {
+  player =
+    new Snake(
+      0,
+      0,
+      color(50, 230, 100),
+      true
+    );
+
+  foods = [];
+
+  for (
+    let i = 0;
+    i &lt; FOOD_COUNT;
+    i++
+  ) {
+    spawnFood();
+  }
+
+  enemies = [];
+
+  for (
+    let i = 0;
+    i &lt; ENEMY_COUNT;
+    i++
+  ) {
+    spawnEnemy();
+  }
+}
+
+// =================================================
+// UI
+// =================================================
+
+function drawUI() {
+  noStroke();
+
+  textAlign(
+    LEFT,
+    TOP
+  );
+
+  fill(255);
+
+  textSize(20);
+
+  text(
+    &quot;長さ: &quot; +
+    player.body.length,
+    20,
+    20
+  );
+
+  textSize(14);
+
+  fill(190);
+
+  text(
+    &quot;マウス：移動　｜　クリック / SPACE：加速&quot;,
+    20,
+    50
+  );
+
+  // ブーストゲージ
+  const gaugeW = 220;
+  const gaugeH = 15;
+
+  fill(40);
+
+  rect(
+    20,
+    80,
+    gaugeW,
+    gaugeH,
+    8
+  );
+
+  fill(
+    255,
+    210,
+    40
+  );
+
+  rect(
+    20,
+    80,
+    gaugeW *
+      player.boostEnergy,
+    gaugeH,
+    8
+  );
+
+  // ランキング
+  let ranking =
+    enemies
+      .filter(e =&gt; !e.dead)
+      .concat([player])
+      .sort(
+        (a, b) =&gt;
+          b.body.length -
+          a.body.length
+      );
+
+  fill(255);
+  textSize(16);
+
+  text(
+    &quot;RANKING&quot;,
+    width - 180,
+    20
+  );
+
+  for (
+    let i = 0;
+    i &lt; min(5, ranking.length);
+    i++
+  ) {
+    const snake =
+      ranking[i];
+
+    fill(
+      snake.isPlayer
+        ? color(80, 255, 100)
+        : 255
+    );
+
+    text(
+      (i + 1) +
+      &quot;. &quot; +
+      snake.body.length,
+      width - 180,
+      45 + i * 22
+    );
+  }
+
+  // GAME OVER
+  if (player.dead) {
+    fill(
+      255,
+      60,
+      70
+    );
+
+    textAlign(
+      CENTER,
+      CENTER
+    );
+
+    textSize(60);
+
+    text(
+      &quot;GAME OVER&quot;,
+      width / 2,
+      height / 2 - 50
+    );
+
+    fill(255);
+
+    textSize(20);
+
+    text(
+      &quot;クリックまたは ENTER でリスタート&quot;,
+      width / 2,
+      height / 2 + 20
+    );
+  }
+}
+
+// =================================================
+// RESIZE
+// =================================================
+
+function windowResized() {
+  resizeCanvas(
+    windowWidth,
+    windowHeight
+  );
+}</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>
