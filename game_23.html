@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>成田大和さんのゲーム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <style>
+    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
+    h1 { font-size: 1.2rem; margin-bottom: 5px; }
+    p { color: #aaa; margin-bottom: 20px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← 回覧板に戻る</a>
+  <h1>成田大和 (4年 番号:5)</h1>
+  <p>マウスについてくる円</p>
+  <script>function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(220);
+  circle(mouseX,mouseY,50);
+}</script>
+</body>
+</html>
