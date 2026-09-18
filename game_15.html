@@ -6,15 +6,92 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
-    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
-    h1 { font-size: 1.2rem; margin-bottom: 5px; }
-    p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
-    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
-    .back-link:hover { text-decoration: underline; }
-    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
-    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+    p {
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    #game-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    #game-container canvas {
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 4px;
+    }
+    .code-container {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      text-align: left;
+      background: #272822;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #1e1e1e;
+      margin: 0;
+      padding: 8px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-header span {
+      font-size: 0.85rem;
+      color: #888;
+      font-weight: bold;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .copy-btn:hover {
+      background: #333;
+      border-color: #666;
+      color: #fff;
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    pre {
+      margin: 0 !important;
+      padding: 15px !important;
+      font-size: 0.85rem;
+      max-height: 500px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -22,473 +99,20 @@
   <h1>作者: 長澤</h1>
   <p>よけてください（WAVEを31までがんばってください）</p>
   
-  <script>let player;
-let bullets = [];
-let enemyBullets = [];
-let enemies = [];
+  <!-- ゲーム画面を配置する領域 -->
+  <div id="game-container"></div>
 
-let score = 0;
-let wave = 1;
-let gameOver = false;
-
-let shootTimer = 0;
-
-// ====================
-// セットアップ
-// ====================
-
-function setup() {
-  createCanvas(600, 600);
-
-  player = {
-    x: width / 2,
-    y: height - 60,
-    speed: 6,
-    size: 30
-  };
-
-  createWave();
-}
-
-// ====================
-// 敵ウェーブ
-// ====================
-
-function createWave() {
-  enemies = [];
-
-  let rows = min(2 + wave, 7);
-  let cols = 8 + min(wave, 4);
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      enemies.push({
-        x: 50 + col * (500 / (cols - 1)),
-        y: 60 + row * 45,
-
-        speed: 1.5 + wave * 0.2,
-        size: 32,
-
-        // 敵ごとに発射タイミングを変える
-        shootTimer: random(30, 180)
-      });
-    }
-  }
-}
-
-// ====================
-// メイン
-// ====================
-
-function draw() {
-  background(5, 10, 25);
-
-  if (gameOver) {
-    drawGameOver();
-    return;
-  }
-
-  movePlayer();
-  drawPlayer();
-
-  updatePlayerBullets();
-  updateEnemies();
-  updateEnemyBullets();
-
-  checkPlayerBulletHits();
-  checkEnemyBulletHits();
-
-  // 敵を全滅
-  if (enemies.length === 0) {
-    wave++;
-    createWave();
-    enemyBullets = [];
-  }
-
-  // UI
-  fill(255);
-  textSize(20);
-  text("SCORE: " + score, 20, 30);
-  text("WAVE: " + wave, 20, 55);
-}
-
-// ====================
-// プレイヤー移動
-// ====================
-
-function movePlayer() {
-
-  if (keyIsDown(LEFT_ARROW)) {
-    player.x -= player.speed;
-  }
-
-  if (keyIsDown(RIGHT_ARROW)) {
-    player.x += player.speed;
-  }
-
-  if (keyIsDown(UP_ARROW)) {
-    player.y -= player.speed;
-  }
-
-  if (keyIsDown(DOWN_ARROW)) {
-    player.y += player.speed;
-  }
-
-  player.x = constrain(player.x, 20, width - 20);
-  player.y = constrain(player.y, 20, height - 20);
-}
-
-// ====================
-// プレイヤー
-// ====================
-
-function drawPlayer() {
-
-  fill(0, 200, 255);
-
-  triangle(
-    player.x,
-    player.y - 25,
-    player.x - 22,
-    player.y + 20,
-    player.x + 22,
-    player.y + 20
-  );
-}
-
-// ====================
-// プレイヤーの弾
-// ====================
-
-function updatePlayerBullets() {
-
-  fill(255, 255, 80);
-
-  for (let i = bullets.length - 1; i >= 0; i--) {
-
-    let b = bullets[i];
-
-    b.x += b.vx;
-    b.y += b.vy;
-
-    ellipse(b.x, b.y, 8, 15);
-
-    if (
-      b.x < -30 ||
-      b.x > width + 30 ||
-      b.y < -30 ||
-      b.y > height + 30
-    ) {
-      bullets.splice(i, 1);
-    }
-  }
-}
-
-// ====================
-// 敵
-// ====================
-
-function updateEnemies() {
-
-  for (let enemy of enemies) {
-
-    enemy.x += enemy.speed;
-
-    if (enemy.x > width - 20 || enemy.x < 20) {
-      enemy.speed *= -1;
-      enemy.y += 15;
-    }
-
-    fill(255, 60, 80);
-    ellipse(
-      enemy.x,
-      enemy.y,
-      enemy.size
-    );
-
-    // ----------------
-    // 敵が弾を撃つ
-    // ----------------
-
-    enemy.shootTimer--;
-
-    if (enemy.shootTimer <= 0) {
-
-      shootEnemyBullets(enemy);
-
-      // ウェーブが進むほど連射
-      enemy.shootTimer =
-        max(40, 150 - wave * 8) + random(20);
-    }
-
-    // 敵がプレイヤーに接触
-    if (
-      dist(
-        player.x,
-        player.y,
-        enemy.x,
-        enemy.y
-      ) < 30
-    ) {
-      gameOver = true;
-    }
-
-    // 敵が下まで来た
-    if (enemy.y > height - 50) {
-      gameOver = true;
-    }
-  }
-}
-
-// ====================
-// 敵の弾を発射
-// ====================
-
-function shootEnemyBullets(enemy) {
-
-  // 敵から8方向に発射
-  let directions = [
-    0,
-    PI / 4,
-    PI / 2,
-    3 * PI / 4,
-    PI,
-    5 * PI / 4,
-    3 * PI / 2,
-    7 * PI / 4
-  ];
-
-  for (let angle of directions) {
-
-    let speed = 2.5 + wave * 0.15;
-
-    enemyBullets.push({
-      x: enemy.x,
-      y: enemy.y,
-
-      vx: cos(angle) * speed,
-      vy: sin(angle) * speed,
-
-      size: 8
-    });
-  }
-}
-
-// ====================
-// 敵の弾
-// ====================
-
-function updateEnemyBullets() {
-
-  fill(255, 100, 30);
-
-  for (
-    let i = enemyBullets.length - 1;
-    i >= 0;
-    i--
-  ) {
-
-    let b = enemyBullets[i];
-
-    b.x += b.vx;
-    b.y += b.vy;
-
-    ellipse(
-      b.x,
-      b.y,
-      b.size
-    );
-
-    // 画面外
-    if (
-      b.x < -30 ||
-      b.x > width + 30 ||
-      b.y < -30 ||
-      b.y > height + 30
-    ) {
-      enemyBullets.splice(i, 1);
-      continue;
-    }
-
-    // プレイヤーに当たった
-    let d = dist(
-      b.x,
-      b.y,
-      player.x,
-      player.y
-    );
-
-    if (d < player.size / 2 + b.size / 2) {
-      gameOver = true;
-    }
-  }
-}
-
-// ====================
-// プレイヤーの弾 vs 敵
-// ====================
-
-function checkPlayerBulletHits() {
-
-  for (
-    let i = enemies.length - 1;
-    i >= 0;
-    i--
-  ) {
-
-    let enemy = enemies[i];
-
-    for (
-      let j = bullets.length - 1;
-      j >= 0;
-      j--
-    ) {
-
-      let b = bullets[j];
-
-      let d = dist(
-        b.x,
-        b.y,
-        enemy.x,
-        enemy.y
-      );
-
-      if (d < enemy.size / 2 + 6) {
-
-        enemies.splice(i, 1);
-        bullets.splice(j, 1);
-
-        score += 100;
-
-        break;
-      }
-    }
-  }
-}
-
-// ====================
-// 敵の弾 vs プレイヤー
-// ====================
-
-function checkEnemyBulletHits() {
-
-  // 念のためここでもチェック
-  for (let b of enemyBullets) {
-
-    if (
-      dist(
-        b.x,
-        b.y,
-        player.x,
-        player.y
-      ) < 18
-    ) {
-      gameOver = true;
-    }
-  }
-}
-
-// ====================
-// プレイヤーのショット
-// ====================
-
-function keyPressed() {
-
-  if (key === ' ') {
-
-    // 真上
-    bullets.push({
-      x: player.x,
-      y: player.y - 25,
-      vx: 0,
-      vy: -10
-    });
-
-    // 左上
-    bullets.push({
-      x: player.x - 10,
-      y: player.y - 20,
-      vx: -3,
-      vy: -10
-    });
-
-    // 右上
-    bullets.push({
-      x: player.x + 10,
-      y: player.y - 20,
-      vx: 3,
-      vy: -10
-    });
-  }
-
-  // リスタート
-  if (key === 'r' || key === 'R') {
-    restartGame();
-  }
-}
-
-// ====================
-// ゲームオーバー
-// ====================
-
-function drawGameOver() {
-
-  fill(255, 50, 50);
-  textAlign(CENTER);
-
-  textSize(50);
-  text(
-    "GAME OVER",
-    width / 2,
-    height / 2
-  );
-
-  fill(255);
-  textSize(20);
-
-  text(
-    "SCORE: " + score,
-    width / 2,
-    height / 2 + 45
-  );
-
-  text(
-    "WAVE: " + wave,
-    width / 2,
-    height / 2 + 75
-  );
-
-  text(
-    "Rキーでリスタート",
-    width / 2,
-    height / 2 + 110
-  );
-
-  textAlign(LEFT);
-}
-
-// ====================
-// リスタート
-// ====================
-
-function restartGame() {
-
-  bullets = [];
-  enemyBullets = [];
-
-  score = 0;
-  wave = 1;
-  gameOver = false;
-
-  player.x = width / 2;
-  player.y = height - 60;
-
-  createWave();
-}</script>
-
+  <!-- ソースコード表示領域（ゲーム画面の下） -->
   <div class="code-container">
-    <h3>ソースコード</h3>
-    <pre><code class="language-javascript">let player;
+    <div class="code-header">
+      <span>ソースコード</span>
+      <button class="copy-btn" id="copy-btn" title="コードをコピー" aria-label="コードをコピー">
+        <svg id="copy-icon" viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+    </div>
+    <pre><code id="source-code" class="language-javascript">let player;
 let bullets = [];
 let enemyBullets = [];
 let enemies = [];
@@ -956,5 +580,504 @@ function restartGame() {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+  <script>
+    // コピー機能の実装
+    const copyBtn = document.getElementById("copy-btn");
+    const copyIcon = document.getElementById("copy-icon");
+    const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+    const checkSvg = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+
+    copyBtn.addEventListener("click", function() {
+      const codeText = document.getElementById("source-code").textContent;
+      navigator.clipboard.writeText(codeText).then(function() {
+        copyIcon.innerHTML = checkSvg;
+        copyBtn.style.color = "#4fc3f7";
+        setTimeout(function() {
+          copyIcon.innerHTML = originalSvg;
+          copyBtn.style.color = "";
+        }, 2000);
+      });
+    });
+
+    // 生成されたキャンバスを #game-container の中に格納する
+    function ensureCanvasInContainer() {
+      const container = document.getElementById("game-container");
+      const canvas = document.querySelector("canvas");
+      if (canvas && canvas.parentElement !== container) {
+        container.appendChild(canvas);
+      }
+    }
+    const canvasObserver = new MutationObserver(function() {
+      ensureCanvasInContainer();
+    });
+    canvasObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("load", ensureCanvasInContainer);
+  </script>
+
+  <!-- 生徒のゲームスクリプト -->
+  <script>let player;
+let bullets = [];
+let enemyBullets = [];
+let enemies = [];
+
+let score = 0;
+let wave = 1;
+let gameOver = false;
+
+let shootTimer = 0;
+
+// ====================
+// セットアップ
+// ====================
+
+function setup() {
+  createCanvas(600, 600);
+
+  player = {
+    x: width / 2,
+    y: height - 60,
+    speed: 6,
+    size: 30
+  };
+
+  createWave();
+}
+
+// ====================
+// 敵ウェーブ
+// ====================
+
+function createWave() {
+  enemies = [];
+
+  let rows = min(2 + wave, 7);
+  let cols = 8 + min(wave, 4);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      enemies.push({
+        x: 50 + col * (500 / (cols - 1)),
+        y: 60 + row * 45,
+
+        speed: 1.5 + wave * 0.2,
+        size: 32,
+
+        // 敵ごとに発射タイミングを変える
+        shootTimer: random(30, 180)
+      });
+    }
+  }
+}
+
+// ====================
+// メイン
+// ====================
+
+function draw() {
+  background(5, 10, 25);
+
+  if (gameOver) {
+    drawGameOver();
+    return;
+  }
+
+  movePlayer();
+  drawPlayer();
+
+  updatePlayerBullets();
+  updateEnemies();
+  updateEnemyBullets();
+
+  checkPlayerBulletHits();
+  checkEnemyBulletHits();
+
+  // 敵を全滅
+  if (enemies.length === 0) {
+    wave++;
+    createWave();
+    enemyBullets = [];
+  }
+
+  // UI
+  fill(255);
+  textSize(20);
+  text("SCORE: " + score, 20, 30);
+  text("WAVE: " + wave, 20, 55);
+}
+
+// ====================
+// プレイヤー移動
+// ====================
+
+function movePlayer() {
+
+  if (keyIsDown(LEFT_ARROW)) {
+    player.x -= player.speed;
+  }
+
+  if (keyIsDown(RIGHT_ARROW)) {
+    player.x += player.speed;
+  }
+
+  if (keyIsDown(UP_ARROW)) {
+    player.y -= player.speed;
+  }
+
+  if (keyIsDown(DOWN_ARROW)) {
+    player.y += player.speed;
+  }
+
+  player.x = constrain(player.x, 20, width - 20);
+  player.y = constrain(player.y, 20, height - 20);
+}
+
+// ====================
+// プレイヤー
+// ====================
+
+function drawPlayer() {
+
+  fill(0, 200, 255);
+
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 22,
+    player.y + 20,
+    player.x + 22,
+    player.y + 20
+  );
+}
+
+// ====================
+// プレイヤーの弾
+// ====================
+
+function updatePlayerBullets() {
+
+  fill(255, 255, 80);
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+
+    let b = bullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(b.x, b.y, 8, 15);
+
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ====================
+// 敵
+// ====================
+
+function updateEnemies() {
+
+  for (let enemy of enemies) {
+
+    enemy.x += enemy.speed;
+
+    if (enemy.x > width - 20 || enemy.x < 20) {
+      enemy.speed *= -1;
+      enemy.y += 15;
+    }
+
+    fill(255, 60, 80);
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // ----------------
+    // 敵が弾を撃つ
+    // ----------------
+
+    enemy.shootTimer--;
+
+    if (enemy.shootTimer <= 0) {
+
+      shootEnemyBullets(enemy);
+
+      // ウェーブが進むほど連射
+      enemy.shootTimer =
+        max(40, 150 - wave * 8) + random(20);
+    }
+
+    // 敵がプレイヤーに接触
+    if (
+      dist(
+        player.x,
+        player.y,
+        enemy.x,
+        enemy.y
+      ) < 30
+    ) {
+      gameOver = true;
+    }
+
+    // 敵が下まで来た
+    if (enemy.y > height - 50) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// 敵の弾を発射
+// ====================
+
+function shootEnemyBullets(enemy) {
+
+  // 敵から8方向に発射
+  let directions = [
+    0,
+    PI / 4,
+    PI / 2,
+    3 * PI / 4,
+    PI,
+    5 * PI / 4,
+    3 * PI / 2,
+    7 * PI / 4
+  ];
+
+  for (let angle of directions) {
+
+    let speed = 2.5 + wave * 0.15;
+
+    enemyBullets.push({
+      x: enemy.x,
+      y: enemy.y,
+
+      vx: cos(angle) * speed,
+      vy: sin(angle) * speed,
+
+      size: 8
+    });
+  }
+}
+
+// ====================
+// 敵の弾
+// ====================
+
+function updateEnemyBullets() {
+
+  fill(255, 100, 30);
+
+  for (
+    let i = enemyBullets.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let b = enemyBullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(
+      b.x,
+      b.y,
+      b.size
+    );
+
+    // 画面外
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // プレイヤーに当たった
+    let d = dist(
+      b.x,
+      b.y,
+      player.x,
+      player.y
+    );
+
+    if (d < player.size / 2 + b.size / 2) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーの弾 vs 敵
+// ====================
+
+function checkPlayerBulletHits() {
+
+  for (
+    let i = enemies.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    for (
+      let j = bullets.length - 1;
+      j >= 0;
+      j--
+    ) {
+
+      let b = bullets[j];
+
+      let d = dist(
+        b.x,
+        b.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (d < enemy.size / 2 + 6) {
+
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+
+        score += 100;
+
+        break;
+      }
+    }
+  }
+}
+
+// ====================
+// 敵の弾 vs プレイヤー
+// ====================
+
+function checkEnemyBulletHits() {
+
+  // 念のためここでもチェック
+  for (let b of enemyBullets) {
+
+    if (
+      dist(
+        b.x,
+        b.y,
+        player.x,
+        player.y
+      ) < 18
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーのショット
+// ====================
+
+function keyPressed() {
+
+  if (key === ' ') {
+
+    // 真上
+    bullets.push({
+      x: player.x,
+      y: player.y - 25,
+      vx: 0,
+      vy: -10
+    });
+
+    // 左上
+    bullets.push({
+      x: player.x - 10,
+      y: player.y - 20,
+      vx: -3,
+      vy: -10
+    });
+
+    // 右上
+    bullets.push({
+      x: player.x + 10,
+      y: player.y - 20,
+      vx: 3,
+      vy: -10
+    });
+  }
+
+  // リスタート
+  if (key === 'r' || key === 'R') {
+    restartGame();
+  }
+}
+
+// ====================
+// ゲームオーバー
+// ====================
+
+function drawGameOver() {
+
+  fill(255, 50, 50);
+  textAlign(CENTER);
+
+  textSize(50);
+  text(
+    "GAME OVER",
+    width / 2,
+    height / 2
+  );
+
+  fill(255);
+  textSize(20);
+
+  text(
+    "SCORE: " + score,
+    width / 2,
+    height / 2 + 45
+  );
+
+  text(
+    "WAVE: " + wave,
+    width / 2,
+    height / 2 + 75
+  );
+
+  text(
+    "Rキーでリスタート",
+    width / 2,
+    height / 2 + 110
+  );
+
+  textAlign(LEFT);
+}
+
+// ====================
+// リスタート
+// ====================
+
+function restartGame() {
+
+  bullets = [];
+  enemyBullets = [];
+
+  score = 0;
+  wave = 1;
+  gameOver = false;
+
+  player.x = width / 2;
+  player.y = height - 60;
+
+  createWave();
+}</script>
 </body>
 </html>
