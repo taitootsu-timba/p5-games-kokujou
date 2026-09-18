@@ -19,14 +19,1696 @@
 </head>
 <body>
   <a href="index.html" class="back-link">← 一覧に戻る</a>
-  <h1>作者: 長澤</h1>
-  <p>よけてくださいWAVEを31まで頑張って）</p>
+  <h1>作者: SO</h1>
+  <p>シューティングゲーム　敵を倒したら自分を強化するアイテムを落とす　敵を100体倒すとボス出現</p>
   
-  <script>https://editor.p5js.org/?version=2.3.3</script>
+  <script>let player;
+let bullets = [];
+let enemies = [];
+let items = [];
+let bossBullets = [];
+
+let score = 0;
+let gameOver = false;
+
+// --------------------
+// プレイヤー設定
+// --------------------
+
+let bulletCount = 1;
+
+// プレイヤーの弾のダメージ
+let bulletDamage = 5;
+
+// 倒した敵の数
+let defeatedEnemies = 0;
+
+// 次のボスが出る撃破数
+let nextBossCount = 100;
+
+// --------------------
+// ボス
+// --------------------
+
+let boss = null;
+
+// --------------------
+// セットアップ
+// --------------------
+
+function setup() {
+  createCanvas(600, 600);
+
+  player = {
+    x: width / 2,
+    y: height - 60,
+    size: 40,
+    speed: 10
+  };
+}
+
+// --------------------
+// メイン
+// --------------------
+
+function draw() {
+  background(10, 15, 35);
+
+  drawStars();
+
+  if (gameOver) {
+    showGameOver();
+    return;
+  }
+
+  movePlayer();
+  drawPlayer();
+
+  updateBullets();
+  updateEnemies();
+  updateItems();
+  updateBoss();
+  updateBossBullets();
+
+  checkCollisions();
+  checkBossCollisions();
+
+  // スコア
+  fill(255);
+  textSize(24);
+  textAlign(LEFT, TOP);
+
+  text("SCORE: " + score, 20, 20);
+  text("BULLETS: " + bulletCount, 20, 50);
+  text("DEFEATED: " + defeatedEnemies, 20, 80);
+
+  // 敵を出す
+  // ボス戦中は普通の敵を出さない
+  if (boss === null && frameCount % 45 === 0) {
+    spawnEnemy();
+  }
+
+  // 100体倒すごとにボスを出す
+  if (
+    boss === null &&
+    defeatedEnemies >= nextBossCount
+  ) {
+    spawnBoss();
+
+    nextBossCount += 100;
+  }
+}
+
+// ==================================================
+// プレイヤー
+// ==================================================
+
+function movePlayer() {
+
+  if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) {
+    player.x -= player.speed;
+  }
+
+  if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) {
+    player.x += player.speed;
+  }
+
+  player.x = constrain(
+    player.x,
+    player.size / 2,
+    width - player.size / 2
+  );
+}
+
+function drawPlayer() {
+
+  push();
+
+  fill(50, 200, 255);
+  noStroke();
+
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 25,
+    player.y + 20,
+    player.x + 25,
+    player.y + 20
+  );
+
+  fill(255, 100, 50);
+
+  triangle(
+    player.x,
+    player.y + 30,
+    player.x - 8,
+    player.y + 15,
+    player.x + 8,
+    player.y + 15
+  );
+
+  pop();
+}
+
+// ==================================================
+// プレイヤーの弾
+// ==================================================
+
+function keyPressed() {
+
+  if (key === " " && !gameOver) {
+
+    // 弾数分だけ発射
+    for (let i = 0; i < bulletCount; i++) {
+
+      let offset =
+        (i - (bulletCount - 1) / 2) * 12;
+
+      bullets.push({
+        x: player.x + offset,
+        y: player.y - 25,
+        speed: 10,
+        size: 8,
+
+        // ダメージ5
+        damage: bulletDamage
+      });
+    }
+  }
+
+  // Rキーでリスタート
+  if (
+    (key === "r" || key === "R") &&
+    gameOver
+  ) {
+    restartGame();
+  }
+}
+
+function updateBullets() {
+
+  for (
+    let i = bullets.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let bullet = bullets[i];
+
+    bullet.y -= bullet.speed;
+
+    fill(255, 240, 50);
+    noStroke();
+
+    ellipse(
+      bullet.x,
+      bullet.y,
+      bullet.size
+    );
+
+    if (bullet.y < 0) {
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ==================================================
+// 普通の敵
+// ==================================================
+
+function spawnEnemy() {
+
+  enemies.push({
+    x: random(30, width - 30),
+    y: -30,
+    size: random(30, 45),
+    speed: random(2, 4)
+  });
+}
+
+function updateEnemies() {
+
+  for (
+    let i = enemies.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    enemy.y += enemy.speed;
+
+    // 敵
+    fill(255, 70, 100);
+    noStroke();
+
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // 目
+    fill(255);
+
+    ellipse(
+      enemy.x - enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      8
+    );
+
+    ellipse(
+      enemy.x + enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      8
+    );
+
+    fill(0);
+
+    ellipse(
+      enemy.x - enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      4
+    );
+
+    ellipse(
+      enemy.x + enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      4
+    );
+
+    // 下まで来たらゲームオーバー
+    if (
+      enemy.y >
+      height + enemy.size
+    ) {
+      gameOver = true;
+    }
+
+    // プレイヤーと衝突
+    let distanceToPlayer = dist(
+      enemy.x,
+      enemy.y,
+      player.x,
+      player.y
+    );
+
+    if (
+      distanceToPlayer <
+      enemy.size / 2 +
+      player.size / 2
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+// ==================================================
+// アイテム
+// ==================================================
+
+function spawnItem(x, y) {
+
+  items.push({
+    x: x,
+    y: y,
+    size: 20,
+    speed: 2
+  });
+}
+
+function updateItems() {
+
+  for (
+    let i = items.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let item = items[i];
+
+    item.y += item.speed;
+
+    // アイテム
+    fill(255, 220, 50);
+    stroke(255);
+    strokeWeight(2);
+
+    rectMode(CENTER);
+
+    rect(
+      item.x,
+      item.y,
+      item.size,
+      item.size
+    );
+
+    // ＋マーク
+    fill(255);
+    noStroke();
+
+    rect(
+      item.x,
+      item.y,
+      12,
+      3
+    );
+
+    rect(
+      item.x,
+      item.y,
+      3,
+      12
+    );
+
+    rectMode(CORNER);
+
+    // 画面外
+    if (
+      item.y >
+      height + item.size
+    ) {
+      items.splice(i, 1);
+      continue;
+    }
+
+    // プレイヤーと接触
+    let distanceToPlayer = dist(
+      item.x,
+      item.y,
+      player.x,
+      player.y
+    );
+
+    if (
+      distanceToPlayer <
+      item.size / 2 +
+      player.size / 2
+    ) {
+
+      bulletCount++;
+
+      items.splice(i, 1);
+    }
+  }
+}
+
+// ==================================================
+// 普通の敵との当たり判定
+// ==================================================
+
+function checkCollisions() {
+
+  for (
+    let i = enemies.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    for (
+      let j = bullets.length - 1;
+      j >= 0;
+      j--
+    ) {
+
+      let bullet = bullets[j];
+
+      let distanceToEnemy = dist(
+        enemy.x,
+        enemy.y,
+        bullet.x,
+        bullet.y
+      );
+
+      if (
+        distanceToEnemy <
+        enemy.size / 2 +
+        bullet.size / 2
+      ) {
+
+        // 敵を倒す
+        enemies.splice(i, 1);
+
+        // 弾を削除
+        bullets.splice(j, 1);
+
+        // スコア
+        score += 10;
+
+        // 撃破数
+        defeatedEnemies++;
+
+        // 20%の確率でアイテム
+        if (random(1) < 0.2) {
+          spawnItem(
+            enemy.x,
+            enemy.y
+          );
+        }
+
+        break;
+      }
+    }
+  }
+}
+
+// ==================================================
+// ボス出現
+// ==================================================
+
+function spawnBoss() {
+
+  boss = {
+    x: width / 2,
+    y: 100,
+
+    size: 120,
+
+    // HP1500
+    hp: 1500,
+    maxHp: 1500,
+
+    // ボスの弾を撃つタイミング
+    shootTimer: 0
+  };
+
+  // 画面に「BOSS」を表示するための演出
+  console.log("BOSS APPEARED!");
+}
+
+// ==================================================
+// ボス
+// ==================================================
+
+function updateBoss() {
+
+  // ボスがいなければ何もしない
+  if (boss === null) {
+    return;
+  }
+
+  // --------------------
+  // ボスを描く
+  // --------------------
+
+  push();
+
+  // ボス本体
+  fill(150, 40, 200);
+  stroke(255);
+  strokeWeight(3);
+
+  ellipse(
+    boss.x,
+    boss.y,
+    boss.size
+  );
+
+  // 目
+  fill(255, 50, 50);
+
+  ellipse(
+    boss.x - 25,
+    boss.y - 10,
+    20
+  );
+
+  ellipse(
+    boss.x + 25,
+    boss.y - 10,
+    20
+  );
+
+  // 口
+  noFill();
+  stroke(255);
+  arc(
+    boss.x,
+    boss.y + 15,
+    50,
+    30,
+    0,
+    PI
+  );
+
+  pop();
+
+  // --------------------
+  // HPバー
+  // --------------------
+
+  let hpWidth = 400;
+
+  // 背景
+  fill(80);
+  noStroke();
+
+  rect(
+    width / 2 - hpWidth / 2,
+    25,
+    hpWidth,
+    20
+  );
+
+  // HP
+  fill(255, 50, 50);
+
+  let currentHpWidth =
+    hpWidth * (boss.hp / boss.maxHp);
+
+  rect(
+    width / 2 - hpWidth / 2,
+    25,
+    currentHpWidth,
+    20
+  );
+
+  // HP文字
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+
+  text(
+    "BOSS HP: " +
+      boss.hp +
+      " / " +
+      boss.maxHp,
+    width / 2,
+    35
+  );
+
+  // --------------------
+  // ボスの攻撃
+  // --------------------
+
+  boss.shootTimer++;
+
+  // 60フレーム = 約1秒
+  if (boss.shootTimer >= 60) {
+
+    shootBossBullet();
+
+    boss.shootTimer = 0;
+  }
+}
+
+// ==================================================
+// ボスの弾
+// ==================================================
+
+function shootBossBullet() {
+
+  // ボスからプレイヤーへの方向
+  let dx =
+    player.x - boss.x;
+
+  let dy =
+    player.y - boss.y;
+
+  let distance =
+    sqrt(dx * dx + dy * dy);
+
+  // 正規化
+  dx /= distance;
+  dy /= distance;
+
+  bossBullets.push({
+
+    x: boss.x,
+    y: boss.y,
+
+    // プレイヤー方向へ飛ぶ
+    vx: dx * 5,
+    vy: dy * 5,
+
+    size: 15
+  });
+}
+
+function updateBossBullets() {
+
+  for (
+    let i = bossBullets.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let bullet =
+      bossBullets[i];
+
+    bullet.x += bullet.vx;
+    bullet.y += bullet.vy;
+
+    // ボスの弾
+    fill(255, 80, 30);
+    noStroke();
+
+    ellipse(
+      bullet.x,
+      bullet.y,
+      bullet.size
+    );
+
+    // 画面外なら削除
+    if (
+      bullet.x < -50 ||
+      bullet.x > width + 50 ||
+      bullet.y < -50 ||
+      bullet.y > height + 50
+    ) {
+
+      bossBullets.splice(i, 1);
+
+      continue;
+    }
+
+    // プレイヤーとの当たり判定
+    let distanceToPlayer =
+      dist(
+        bullet.x,
+        bullet.y,
+        player.x,
+        player.y
+      );
+
+    if (
+      distanceToPlayer <
+      bullet.size / 2 +
+      player.size / 2
+    ) {
+
+      // 当たったら即ゲームオーバー
+      gameOver = true;
+    }
+  }
+}
+
+// ==================================================
+// ボスとプレイヤーの弾の当たり判定
+// ==================================================
+
+function checkBossCollisions() {
+
+  if (boss === null) {
+    return;
+  }
+
+  for (
+    let i = bullets.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let bullet = bullets[i];
+
+    let distanceToBoss =
+      dist(
+        bullet.x,
+        bullet.y,
+        boss.x,
+        boss.y
+      );
+
+    if (
+      distanceToBoss <
+      boss.size / 2 +
+      bullet.size / 2
+    ) {
+
+      // 弾のダメージ5
+      boss.hp -= bullet.damage;
+
+      // 弾を削除
+      bullets.splice(i, 1);
+
+      // ボス撃破
+      if (boss.hp <= 0) {
+
+        boss.hp = 0;
+
+        // ボーナススコア
+        score += 1000;
+
+        // ボスを消す
+        boss = null;
+
+        // ボスの弾も消す
+        bossBullets = [];
+
+        // 次のボスはさらに100体倒したあと
+        // nextBossCountはdraw()側ですでに100増えている
+        break;
+      }
+    }
+  }
+}
+
+// ==================================================
+// 星
+// ==================================================
+
+function drawStars() {
+
+  fill(255);
+  noStroke();
+
+  for (let i = 0; i < 50; i++) {
+
+    let x =
+      (i * 137) % width;
+
+    let y =
+      (i * 83 +
+        frameCount * 0.5) %
+      height;
+
+    ellipse(
+      x,
+      y,
+      2,
+      2
+    );
+  }
+}
+
+// ==================================================
+// ゲームオーバー
+// ==================================================
+
+function showGameOver() {
+
+  background(15, 10, 25);
+
+  fill(255, 80, 80);
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(50);
+
+  text(
+    "GAME OVER",
+    width / 2,
+    height / 2 - 50
+  );
+
+  fill(255);
+
+  textSize(25);
+
+  text(
+    "SCORE: " + score,
+    width / 2,
+    height / 2 + 10
+  );
+
+  textSize(20);
+
+  text(
+    "Rキーでリスタート",
+    width / 2,
+    height / 2 + 60
+  );
+}
+
+// ==================================================
+// リスタート
+// ==================================================
+
+function restartGame() {
+
+  bullets = [];
+  enemies = [];
+  items = [];
+  bossBullets = [];
+
+  score = 0;
+
+  bulletCount = 1;
+
+  bulletDamage = 5;
+
+  defeatedEnemies = 0;
+
+  nextBossCount = 100;
+
+  boss = null;
+
+  gameOver = false;
+
+  player.x = width / 2;
+  player.y = height - 60;
+}
+</script>
 
   <div class="code-container">
     <h3>ソースコード</h3>
-    <pre><code class="language-javascript">https://editor.p5js.org/?version=2.3.3</code></pre>
+    <pre><code class="language-javascript">let player;
+let bullets = [];
+let enemies = [];
+let items = [];
+let bossBullets = [];
+
+let score = 0;
+let gameOver = false;
+
+// --------------------
+// プレイヤー設定
+// --------------------
+
+let bulletCount = 1;
+
+// プレイヤーの弾のダメージ
+let bulletDamage = 5;
+
+// 倒した敵の数
+let defeatedEnemies = 0;
+
+// 次のボスが出る撃破数
+let nextBossCount = 100;
+
+// --------------------
+// ボス
+// --------------------
+
+let boss = null;
+
+// --------------------
+// セットアップ
+// --------------------
+
+function setup() {
+  createCanvas(600, 600);
+
+  player = {
+    x: width / 2,
+    y: height - 60,
+    size: 40,
+    speed: 10
+  };
+}
+
+// --------------------
+// メイン
+// --------------------
+
+function draw() {
+  background(10, 15, 35);
+
+  drawStars();
+
+  if (gameOver) {
+    showGameOver();
+    return;
+  }
+
+  movePlayer();
+  drawPlayer();
+
+  updateBullets();
+  updateEnemies();
+  updateItems();
+  updateBoss();
+  updateBossBullets();
+
+  checkCollisions();
+  checkBossCollisions();
+
+  // スコア
+  fill(255);
+  textSize(24);
+  textAlign(LEFT, TOP);
+
+  text(&quot;SCORE: &quot; + score, 20, 20);
+  text(&quot;BULLETS: &quot; + bulletCount, 20, 50);
+  text(&quot;DEFEATED: &quot; + defeatedEnemies, 20, 80);
+
+  // 敵を出す
+  // ボス戦中は普通の敵を出さない
+  if (boss === null &amp;&amp; frameCount % 45 === 0) {
+    spawnEnemy();
+  }
+
+  // 100体倒すごとにボスを出す
+  if (
+    boss === null &amp;&amp;
+    defeatedEnemies &gt;= nextBossCount
+  ) {
+    spawnBoss();
+
+    nextBossCount += 100;
+  }
+}
+
+// ==================================================
+// プレイヤー
+// ==================================================
+
+function movePlayer() {
+
+  if (keyIsDown(LEFT_ARROW) || keyIsDown(65)) {
+    player.x -= player.speed;
+  }
+
+  if (keyIsDown(RIGHT_ARROW) || keyIsDown(68)) {
+    player.x += player.speed;
+  }
+
+  player.x = constrain(
+    player.x,
+    player.size / 2,
+    width - player.size / 2
+  );
+}
+
+function drawPlayer() {
+
+  push();
+
+  fill(50, 200, 255);
+  noStroke();
+
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 25,
+    player.y + 20,
+    player.x + 25,
+    player.y + 20
+  );
+
+  fill(255, 100, 50);
+
+  triangle(
+    player.x,
+    player.y + 30,
+    player.x - 8,
+    player.y + 15,
+    player.x + 8,
+    player.y + 15
+  );
+
+  pop();
+}
+
+// ==================================================
+// プレイヤーの弾
+// ==================================================
+
+function keyPressed() {
+
+  if (key === &quot; &quot; &amp;&amp; !gameOver) {
+
+    // 弾数分だけ発射
+    for (let i = 0; i &lt; bulletCount; i++) {
+
+      let offset =
+        (i - (bulletCount - 1) / 2) * 12;
+
+      bullets.push({
+        x: player.x + offset,
+        y: player.y - 25,
+        speed: 10,
+        size: 8,
+
+        // ダメージ5
+        damage: bulletDamage
+      });
+    }
+  }
+
+  // Rキーでリスタート
+  if (
+    (key === &quot;r&quot; || key === &quot;R&quot;) &amp;&amp;
+    gameOver
+  ) {
+    restartGame();
+  }
+}
+
+function updateBullets() {
+
+  for (
+    let i = bullets.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let bullet = bullets[i];
+
+    bullet.y -= bullet.speed;
+
+    fill(255, 240, 50);
+    noStroke();
+
+    ellipse(
+      bullet.x,
+      bullet.y,
+      bullet.size
+    );
+
+    if (bullet.y &lt; 0) {
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ==================================================
+// 普通の敵
+// ==================================================
+
+function spawnEnemy() {
+
+  enemies.push({
+    x: random(30, width - 30),
+    y: -30,
+    size: random(30, 45),
+    speed: random(2, 4)
+  });
+}
+
+function updateEnemies() {
+
+  for (
+    let i = enemies.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    enemy.y += enemy.speed;
+
+    // 敵
+    fill(255, 70, 100);
+    noStroke();
+
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // 目
+    fill(255);
+
+    ellipse(
+      enemy.x - enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      8
+    );
+
+    ellipse(
+      enemy.x + enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      8
+    );
+
+    fill(0);
+
+    ellipse(
+      enemy.x - enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      4
+    );
+
+    ellipse(
+      enemy.x + enemy.size * 0.2,
+      enemy.y - enemy.size * 0.1,
+      4
+    );
+
+    // 下まで来たらゲームオーバー
+    if (
+      enemy.y &gt;
+      height + enemy.size
+    ) {
+      gameOver = true;
+    }
+
+    // プレイヤーと衝突
+    let distanceToPlayer = dist(
+      enemy.x,
+      enemy.y,
+      player.x,
+      player.y
+    );
+
+    if (
+      distanceToPlayer &lt;
+      enemy.size / 2 +
+      player.size / 2
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+// ==================================================
+// アイテム
+// ==================================================
+
+function spawnItem(x, y) {
+
+  items.push({
+    x: x,
+    y: y,
+    size: 20,
+    speed: 2
+  });
+}
+
+function updateItems() {
+
+  for (
+    let i = items.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let item = items[i];
+
+    item.y += item.speed;
+
+    // アイテム
+    fill(255, 220, 50);
+    stroke(255);
+    strokeWeight(2);
+
+    rectMode(CENTER);
+
+    rect(
+      item.x,
+      item.y,
+      item.size,
+      item.size
+    );
+
+    // ＋マーク
+    fill(255);
+    noStroke();
+
+    rect(
+      item.x,
+      item.y,
+      12,
+      3
+    );
+
+    rect(
+      item.x,
+      item.y,
+      3,
+      12
+    );
+
+    rectMode(CORNER);
+
+    // 画面外
+    if (
+      item.y &gt;
+      height + item.size
+    ) {
+      items.splice(i, 1);
+      continue;
+    }
+
+    // プレイヤーと接触
+    let distanceToPlayer = dist(
+      item.x,
+      item.y,
+      player.x,
+      player.y
+    );
+
+    if (
+      distanceToPlayer &lt;
+      item.size / 2 +
+      player.size / 2
+    ) {
+
+      bulletCount++;
+
+      items.splice(i, 1);
+    }
+  }
+}
+
+// ==================================================
+// 普通の敵との当たり判定
+// ==================================================
+
+function checkCollisions() {
+
+  for (
+    let i = enemies.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    for (
+      let j = bullets.length - 1;
+      j &gt;= 0;
+      j--
+    ) {
+
+      let bullet = bullets[j];
+
+      let distanceToEnemy = dist(
+        enemy.x,
+        enemy.y,
+        bullet.x,
+        bullet.y
+      );
+
+      if (
+        distanceToEnemy &lt;
+        enemy.size / 2 +
+        bullet.size / 2
+      ) {
+
+        // 敵を倒す
+        enemies.splice(i, 1);
+
+        // 弾を削除
+        bullets.splice(j, 1);
+
+        // スコア
+        score += 10;
+
+        // 撃破数
+        defeatedEnemies++;
+
+        // 20%の確率でアイテム
+        if (random(1) &lt; 0.2) {
+          spawnItem(
+            enemy.x,
+            enemy.y
+          );
+        }
+
+        break;
+      }
+    }
+  }
+}
+
+// ==================================================
+// ボス出現
+// ==================================================
+
+function spawnBoss() {
+
+  boss = {
+    x: width / 2,
+    y: 100,
+
+    size: 120,
+
+    // HP1500
+    hp: 1500,
+    maxHp: 1500,
+
+    // ボスの弾を撃つタイミング
+    shootTimer: 0
+  };
+
+  // 画面に「BOSS」を表示するための演出
+  console.log(&quot;BOSS APPEARED!&quot;);
+}
+
+// ==================================================
+// ボス
+// ==================================================
+
+function updateBoss() {
+
+  // ボスがいなければ何もしない
+  if (boss === null) {
+    return;
+  }
+
+  // --------------------
+  // ボスを描く
+  // --------------------
+
+  push();
+
+  // ボス本体
+  fill(150, 40, 200);
+  stroke(255);
+  strokeWeight(3);
+
+  ellipse(
+    boss.x,
+    boss.y,
+    boss.size
+  );
+
+  // 目
+  fill(255, 50, 50);
+
+  ellipse(
+    boss.x - 25,
+    boss.y - 10,
+    20
+  );
+
+  ellipse(
+    boss.x + 25,
+    boss.y - 10,
+    20
+  );
+
+  // 口
+  noFill();
+  stroke(255);
+  arc(
+    boss.x,
+    boss.y + 15,
+    50,
+    30,
+    0,
+    PI
+  );
+
+  pop();
+
+  // --------------------
+  // HPバー
+  // --------------------
+
+  let hpWidth = 400;
+
+  // 背景
+  fill(80);
+  noStroke();
+
+  rect(
+    width / 2 - hpWidth / 2,
+    25,
+    hpWidth,
+    20
+  );
+
+  // HP
+  fill(255, 50, 50);
+
+  let currentHpWidth =
+    hpWidth * (boss.hp / boss.maxHp);
+
+  rect(
+    width / 2 - hpWidth / 2,
+    25,
+    currentHpWidth,
+    20
+  );
+
+  // HP文字
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+
+  text(
+    &quot;BOSS HP: &quot; +
+      boss.hp +
+      &quot; / &quot; +
+      boss.maxHp,
+    width / 2,
+    35
+  );
+
+  // --------------------
+  // ボスの攻撃
+  // --------------------
+
+  boss.shootTimer++;
+
+  // 60フレーム = 約1秒
+  if (boss.shootTimer &gt;= 60) {
+
+    shootBossBullet();
+
+    boss.shootTimer = 0;
+  }
+}
+
+// ==================================================
+// ボスの弾
+// ==================================================
+
+function shootBossBullet() {
+
+  // ボスからプレイヤーへの方向
+  let dx =
+    player.x - boss.x;
+
+  let dy =
+    player.y - boss.y;
+
+  let distance =
+    sqrt(dx * dx + dy * dy);
+
+  // 正規化
+  dx /= distance;
+  dy /= distance;
+
+  bossBullets.push({
+
+    x: boss.x,
+    y: boss.y,
+
+    // プレイヤー方向へ飛ぶ
+    vx: dx * 5,
+    vy: dy * 5,
+
+    size: 15
+  });
+}
+
+function updateBossBullets() {
+
+  for (
+    let i = bossBullets.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let bullet =
+      bossBullets[i];
+
+    bullet.x += bullet.vx;
+    bullet.y += bullet.vy;
+
+    // ボスの弾
+    fill(255, 80, 30);
+    noStroke();
+
+    ellipse(
+      bullet.x,
+      bullet.y,
+      bullet.size
+    );
+
+    // 画面外なら削除
+    if (
+      bullet.x &lt; -50 ||
+      bullet.x &gt; width + 50 ||
+      bullet.y &lt; -50 ||
+      bullet.y &gt; height + 50
+    ) {
+
+      bossBullets.splice(i, 1);
+
+      continue;
+    }
+
+    // プレイヤーとの当たり判定
+    let distanceToPlayer =
+      dist(
+        bullet.x,
+        bullet.y,
+        player.x,
+        player.y
+      );
+
+    if (
+      distanceToPlayer &lt;
+      bullet.size / 2 +
+      player.size / 2
+    ) {
+
+      // 当たったら即ゲームオーバー
+      gameOver = true;
+    }
+  }
+}
+
+// ==================================================
+// ボスとプレイヤーの弾の当たり判定
+// ==================================================
+
+function checkBossCollisions() {
+
+  if (boss === null) {
+    return;
+  }
+
+  for (
+    let i = bullets.length - 1;
+    i &gt;= 0;
+    i--
+  ) {
+
+    let bullet = bullets[i];
+
+    let distanceToBoss =
+      dist(
+        bullet.x,
+        bullet.y,
+        boss.x,
+        boss.y
+      );
+
+    if (
+      distanceToBoss &lt;
+      boss.size / 2 +
+      bullet.size / 2
+    ) {
+
+      // 弾のダメージ5
+      boss.hp -= bullet.damage;
+
+      // 弾を削除
+      bullets.splice(i, 1);
+
+      // ボス撃破
+      if (boss.hp &lt;= 0) {
+
+        boss.hp = 0;
+
+        // ボーナススコア
+        score += 1000;
+
+        // ボスを消す
+        boss = null;
+
+        // ボスの弾も消す
+        bossBullets = [];
+
+        // 次のボスはさらに100体倒したあと
+        // nextBossCountはdraw()側ですでに100増えている
+        break;
+      }
+    }
+  }
+}
+
+// ==================================================
+// 星
+// ==================================================
+
+function drawStars() {
+
+  fill(255);
+  noStroke();
+
+  for (let i = 0; i &lt; 50; i++) {
+
+    let x =
+      (i * 137) % width;
+
+    let y =
+      (i * 83 +
+        frameCount * 0.5) %
+      height;
+
+    ellipse(
+      x,
+      y,
+      2,
+      2
+    );
+  }
+}
+
+// ==================================================
+// ゲームオーバー
+// ==================================================
+
+function showGameOver() {
+
+  background(15, 10, 25);
+
+  fill(255, 80, 80);
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(50);
+
+  text(
+    &quot;GAME OVER&quot;,
+    width / 2,
+    height / 2 - 50
+  );
+
+  fill(255);
+
+  textSize(25);
+
+  text(
+    &quot;SCORE: &quot; + score,
+    width / 2,
+    height / 2 + 10
+  );
+
+  textSize(20);
+
+  text(
+    &quot;Rキーでリスタート&quot;,
+    width / 2,
+    height / 2 + 60
+  );
+}
+
+// ==================================================
+// リスタート
+// ==================================================
+
+function restartGame() {
+
+  bullets = [];
+  enemies = [];
+  items = [];
+  bossBullets = [];
+
+  score = 0;
+
+  bulletCount = 1;
+
+  bulletDamage = 5;
+
+  defeatedEnemies = 0;
+
+  nextBossCount = 100;
+
+  boss = null;
+
+  gameOver = false;
+
+  player.x = width / 2;
+  player.y = height - 60;
+}
+</code></pre>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
