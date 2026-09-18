@@ -12,13 +12,9 @@
       background: #121212;
       color: #fff;
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      text-align: center;
     }
     .header-group {
-      order: 1;
-      text-align: center;
       margin-bottom: 20px;
     }
     h1 {
@@ -38,17 +34,23 @@
     .back-link:hover {
       text-decoration: underline;
     }
-    /* canvasがどこに挿入されても確実に2番目（中央）に配置する */
-    canvas, #defaultCanvas0 {
-      order: 2 !important;
-      margin: 10px auto 40px auto !important;
+    /* ゲーム画面エリア（中央寄せ） */
+    #game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      margin: 10px auto 40px auto;
+      min-height: 100px;
+    }
+    #game-container canvas {
       display: block !important;
+      margin: 0 auto !important;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       border-radius: 4px;
     }
-    /* ソースコード枠は確実に3番目（一番下）に配置する */
+    /* ソースコード枠（ゲーム画面の下） */
     .code-container {
-      order: 3 !important;
       width: 100%;
       max-width: 800px;
       margin: 0 auto 40px auto;
@@ -104,12 +106,17 @@
   </style>
 </head>
 <body>
+  <!-- 1. ヘッダー情報 -->
   <div class="header-group">
     <a href="index.html" class="back-link">← 一覧に戻る</a>
     <h1>作者: 塚原</h1>
     <p>ジャグラー</p>
   </div>
 
+  <!-- 2. ゲーム画面コンテナ（必ずコード枠の上） -->
+  <div id="game-container"></div>
+
+  <!-- 3. ソースコード枠（必ずゲーム画面の下） -->
   <div class="code-container">
     <div class="code-header">
       <span>ソースコード</span>
@@ -412,6 +419,7 @@ function playGakoSound() {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 
   <script>
+    // コピーボタン処理
     const copyBtn = document.getElementById("copy-btn");
     const copyIcon = document.getElementById("copy-icon");
     const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
@@ -428,9 +436,38 @@ function playGakoSound() {
         }, 2000);
       });
     });
+
+    // キャンバス生成位置を #game-container の中に強制移動する
+    function relocateCanvas() {
+      const container = document.getElementById("game-container");
+      const canvases = document.querySelectorAll("canvas");
+      canvases.forEach(cvs => {
+        if (cvs.parentElement !== container) {
+          container.appendChild(cvs);
+        }
+      });
+    }
+
+    // DOM変更を常時監視して、キャンバスがbody直下に作られた瞬間に即移動
+    const observer = new MutationObserver(relocateCanvas);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("DOMContentLoaded", relocateCanvas);
+    window.addEventListener("load", relocateCanvas);
   </script>
 
-  <!-- 生徒のゲームスクリプト -->
+  <!-- 4. 生徒のスクリプト実行 -->
+  <script>
+    // 生徒が定義する setup の完了時にも即座にキャンバス格納を実行するフック
+    window.addEventListener('load', () => {
+      if (typeof window.setup === 'function') {
+        const originalSetup = window.setup;
+        window.setup = function() {
+          originalSetup.apply(this, arguments);
+          relocateCanvas();
+        };
+      }
+    });
+  </script>
   <script>const BONUS_PROBABILITY = 1 / 134; // 設定6並みの合算確率
 const symbols = ["🍒", "🍇", "🔔", "🤡", "７"];
 
