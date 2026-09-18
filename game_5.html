@@ -2,21 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>大久保こうさんのゲーム</title>
+  <title>p5.js ゲーム作品</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
     body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
     h1 { font-size: 1.2rem; margin-bottom: 5px; }
     p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
     .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
+    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 回覧板に戻る</a>
-  <h1>大久保こう (3年 番号:3)</h1>
+  <a href="index.html" class="back-link">← 一覧に戻る</a>
+  <h1>作者: 大久</h1>
   <p>マリオ</p>
+  
   <script>// ==========================================
 // レベルアップ式 5コース マリオ風ゲーム
 // ==========================================
@@ -2074,5 +2079,2070 @@ function mousePressed() {
   }
 }
 </script>
+
+  <div class="code-container">
+    <h3>ソースコード</h3>
+    <pre><code class="language-javascript">// ==========================================
+// レベルアップ式 5コース マリオ風ゲーム
+// ==========================================
+
+let player;
+
+let platforms = [];
+let blocks = [];
+let coins = [];
+let enemies = [];
+let items = [];
+
+let level = 1;
+let score = 0;
+let lives = 3;
+
+let cameraX = 0;
+
+let gameState = &quot;play&quot;;
+
+
+// ==========================================
+// SETUP
+// ==========================================
+
+function setup() {
+
+  createCanvas(800, 450);
+
+  startLevel(1);
+}
+
+
+// ==========================================
+// DRAW
+// ==========================================
+
+function draw() {
+
+  drawBackground();
+
+  if (gameState === &quot;play&quot;) {
+
+    updateGame();
+  }
+
+  drawWorld();
+
+  drawUI();
+
+
+  if (gameState === &quot;levelClear&quot;) {
+
+    drawLevelClear();
+  }
+
+
+  if (gameState === &quot;gameover&quot;) {
+
+    drawGameOver();
+  }
+
+
+  if (gameState === &quot;allClear&quot;) {
+
+    drawAllClear();
+  }
+}
+
+
+// ==========================================
+// レベル開始
+// ==========================================
+
+function startLevel(n) {
+
+  level = n;
+
+  platforms = [];
+  blocks = [];
+  coins = [];
+  enemies = [];
+  items = [];
+
+  cameraX = 0;
+
+  player = new Player(80, 300);
+
+  createLevel(n);
+
+  gameState = &quot;play&quot;;
+}
+
+
+// ==========================================
+// レベル作成
+// ==========================================
+
+function createLevel(n) {
+
+  // ----------------------------------------
+  // LEVEL 1
+  // ----------------------------------------
+
+  if (n === 1) {
+
+    makeGround(0, 3300);
+
+    makePlatform(400, 320, 200);
+    makePlatform(800, 280, 200);
+    makePlatform(1200, 320, 200);
+    makePlatform(1650, 280, 200);
+    makePlatform(2100, 320, 200);
+    makePlatform(2500, 270, 200);
+
+    makeBlock(500, 260);
+    makeBlock(850, 220);
+    makeBlock(1250, 260);
+    makeBlock(1700, 220);
+    makeBlock(2150, 260);
+    makeBlock(2550, 210);
+
+    addCoinsLine(150, 2700, 350);
+
+    makeEnemy(650, 1);
+    makeEnemy(1100, 1);
+    makeEnemy(1500, 1);
+    makeEnemy(2000, 1);
+    makeEnemy(2400, 1);
+
+    player.goalX = 3100;
+  }
+
+
+  // ----------------------------------------
+  // LEVEL 2
+  // ----------------------------------------
+
+  if (n === 2) {
+
+    makeGround(0, 350);
+    makeGround(500, 650);
+    makeGround(1300, 500);
+    makeGround(1950, 700);
+    makeGround(2800, 500);
+
+    makePlatform(600, 300, 140);
+    makePlatform(900, 240, 140);
+    makePlatform(1350, 280, 140);
+    makePlatform(1600, 220, 140);
+    makePlatform(2000, 300, 140);
+    makePlatform(2300, 240, 140);
+    makePlatform(2600, 300, 140);
+    makePlatform(2900, 230, 140);
+
+    makeBlock(650, 250);
+    makeBlock(950, 190);
+    makeBlock(1400, 230);
+    makeBlock(1650, 170);
+    makeBlock(2050, 250);
+    makeBlock(2350, 190);
+    makeBlock(2650, 250);
+    makeBlock(2950, 180);
+
+    addCoinsLine(100, 3100, 350);
+
+    makeEnemy(600, 1.8);
+    makeEnemy(850, 2);
+    makeEnemy(1200, 2);
+    makeEnemy(1450, 2.2);
+    makeEnemy(1750, 2.2);
+    makeEnemy(2100, 2.3);
+    makeEnemy(2500, 2.4);
+    makeEnemy(2900, 2.5);
+
+    player.goalX = 3150;
+  }
+
+
+  // ----------------------------------------
+  // LEVEL 3
+  // ----------------------------------------
+
+  if (n === 3) {
+
+    makeGround(0, 300);
+
+    makeGround(500, 350);
+
+    makeGround(1000, 300);
+
+    makeGround(1500, 350);
+
+    makeGround(2050, 350);
+
+    makeGround(2600, 400);
+
+    makePlatform(250, 300, 120);
+    makePlatform(550, 250, 120);
+    makePlatform(800, 200, 120);
+
+    makePlatform(1050, 280, 120);
+    makePlatform(1300, 220, 120);
+
+    makePlatform(1550, 280, 120);
+    makePlatform(1800, 210, 120);
+
+    makePlatform(2100, 280, 120);
+    makePlatform(2350, 210, 120);
+
+    makePlatform(2650, 270, 120);
+    makePlatform(2900, 200, 120);
+
+    makeBlock(300, 240);
+    makeBlock(850, 140);
+    makeBlock(1100, 220);
+    makeBlock(1350, 160);
+    makeBlock(1600, 220);
+    makeBlock(1850, 150);
+    makeBlock(2150, 220);
+    makeBlock(2400, 150);
+    makeBlock(2700, 210);
+    makeBlock(2950, 140);
+
+    addCoinsLine(100, 3000, 350);
+
+    makeEnemy(550, 2.5);
+    makeEnemy(800, 2.6);
+    makeEnemy(1100, 2.7);
+    makeEnemy(1550, 2.8);
+    makeEnemy(1800, 3);
+    makeEnemy(2150, 3);
+    makeEnemy(2500, 3.1);
+    makeEnemy(2800, 3.2);
+
+    player.goalX = 3150;
+  }
+
+
+  // ----------------------------------------
+  // LEVEL 4
+  // ----------------------------------------
+
+  if (n === 4) {
+
+    makeGround(0, 250);
+    makeGround(450, 250);
+    makeGround(850, 250);
+    makeGround(1250, 250);
+    makeGround(1650, 250);
+    makeGround(2050, 250);
+    makeGround(2450, 250);
+    makeGround(2850, 450);
+
+    makePlatform(200, 300, 100);
+    makePlatform(500, 250, 100);
+    makePlatform(700, 180, 100);
+    makePlatform(900, 280, 100);
+    makePlatform(1100, 210, 100);
+    makePlatform(1300, 300, 100);
+    makePlatform(1500, 220, 100);
+    makePlatform(1700, 280, 100);
+    makePlatform(1900, 200, 100);
+    makePlatform(2100, 300, 100);
+    makePlatform(2300, 220, 100);
+    makePlatform(2500, 280, 100);
+    makePlatform(2700, 190, 100);
+    makePlatform(2900, 260, 100);
+
+    makeBlock(500, 200);
+    makeBlock(1100, 160);
+    makeBlock(1700, 230);
+    makeBlock(2300, 170);
+    makeBlock(2700, 140);
+
+    addCoinsLine(80, 3000, 400);
+
+    for (
+      let x = 500;
+      x &lt; 2900;
+      x += 300
+    ) {
+
+      makeEnemy(
+        x,
+        3.2 + random(0, 1)
+      );
+    }
+
+    player.goalX = 3200;
+  }
+
+
+  // ----------------------------------------
+  // LEVEL 5
+  // ----------------------------------------
+
+  if (n === 5) {
+
+    makeGround(0, 250);
+
+    makeGround(450, 180);
+
+    makeGround(800, 180);
+
+    makeGround(1150, 180);
+
+    makeGround(1500, 180);
+
+    makeGround(1850, 180);
+
+    makeGround(2200, 180);
+
+    makeGround(2550, 180);
+
+    makeGround(2900, 180);
+
+    makeGround(3250, 500);
+
+
+    // 難しい足場
+    makePlatform(200, 300, 80);
+    makePlatform(450, 240, 80);
+    makePlatform(650, 180, 80);
+    makePlatform(850, 260, 80);
+    makePlatform(1050, 200, 80);
+    makePlatform(1200, 280, 80);
+    makePlatform(1400, 190, 80);
+    makePlatform(1550, 260, 80);
+    makePlatform(1750, 180, 80);
+    makePlatform(1900, 260, 80);
+    makePlatform(2100, 180, 80);
+    makePlatform(2250, 260, 80);
+    makePlatform(2450, 180, 80);
+    makePlatform(2600, 250, 80);
+    makePlatform(2800, 170, 80);
+    makePlatform(2950, 250, 80);
+    makePlatform(3150, 180, 80);
+
+
+    // ブロック
+    makeBlock(450, 190);
+    makeBlock(850, 210);
+    makeBlock(1200, 230);
+    makeBlock(1550, 210);
+    makeBlock(1900, 210);
+    makeBlock(2250, 210);
+    makeBlock(2600, 200);
+    makeBlock(2950, 190);
+
+
+    addCoinsLine(100, 3300, 380);
+
+
+    // 高速の敵
+    for (
+      let x = 500;
+      x &lt; 3200;
+      x += 280
+    ) {
+
+      makeEnemy(
+        x,
+        4 + random(0, 1)
+      );
+    }
+
+
+    player.goalX = 3650;
+  }
+}
+
+
+// ==========================================
+// ステージ部品
+// ==========================================
+
+function makeGround(x, w) {
+
+  platforms.push(
+    new Platform(
+      x,
+      400,
+      w,
+      50
+    )
+  );
+}
+
+
+function makePlatform(x, y, w) {
+
+  platforms.push(
+    new Platform(
+      x,
+      y,
+      w,
+      30
+    )
+  );
+}
+
+
+function makeBlock(x, y) {
+
+  blocks.push(
+    new QuestionBlock(x, y)
+  );
+}
+
+
+function makeEnemy(x, speed) {
+
+  enemies.push(
+    new Enemy(
+      x,
+      368,
+      speed
+    )
+  );
+}
+
+
+function makeCoin(x, y) {
+
+  coins.push({
+
+    x: x,
+    y: y,
+
+    taken: false,
+
+    angle: 0
+  });
+}
+
+
+function addCoinsLine(
+  start,
+  end,
+  y
+) {
+
+  for (
+    let x = start;
+    x &lt;= end;
+    x += 250
+  ) {
+
+    makeCoin(x, y);
+  }
+}
+
+
+// ==========================================
+// ゲーム更新
+// ==========================================
+
+function updateGame() {
+
+  player.update();
+
+
+  for (let enemy of enemies) {
+
+    enemy.update();
+  }
+
+
+  for (let item of items) {
+
+    item.update();
+  }
+
+
+  checkPlatforms();
+
+  checkBlocks();
+
+  checkCoins();
+
+  checkItems();
+
+  checkEnemies();
+
+
+  // 落下
+  if (player.y &gt; 520) {
+
+    damage();
+  }
+
+
+  // ゴール
+  if (
+    player.x &gt;= player.goalX
+  ) {
+
+    gameState = &quot;levelClear&quot;;
+  }
+
+
+  // カメラ
+  cameraX =
+    player.x - 250;
+
+
+  cameraX =
+    constrain(
+      cameraX,
+      0,
+      player.goalX - 550
+    );
+}
+
+
+// ==========================================
+// プレイヤー
+// ==========================================
+
+class Player {
+
+  constructor(x, y) {
+
+    this.x = x;
+    this.y = y;
+
+    this.w = 32;
+    this.h = 48;
+
+    this.vx = 0;
+    this.vy = 0;
+
+    this.speed = 5;
+
+    this.jumpPower = 12;
+
+    this.grounded = false;
+
+    this.big = false;
+
+    this.invincible = 0;
+
+    this.star = 0;
+
+    this.goalX = 3000;
+  }
+
+
+  update() {
+
+    // 左
+    if (
+      keyIsDown(LEFT_ARROW)
+    ) {
+
+      this.vx = -this.speed;
+    }
+
+
+    // 右
+    else if (
+      keyIsDown(RIGHT_ARROW)
+    ) {
+
+      this.vx = this.speed;
+    }
+
+
+    // 何も押していない
+    else {
+
+      this.vx *= 0.75;
+
+      if (
+        abs(this.vx) &lt; 0.1
+      ) {
+
+        this.vx = 0;
+      }
+    }
+
+
+    // 重力
+    this.vy += 0.55;
+
+
+    // 移動
+    this.x += this.vx;
+
+    this.y += this.vy;
+
+
+    // 左端
+    if (this.x &lt; 0) {
+
+      this.x = 0;
+    }
+
+
+    // 無敵
+    if (
+      this.invincible &gt; 0
+    ) {
+
+      this.invincible--;
+    }
+
+
+    if (
+      this.star &gt; 0
+    ) {
+
+      this.star--;
+    }
+  }
+
+
+  jump() {
+
+    if (this.grounded) {
+
+      this.vy =
+        -this.jumpPower;
+
+      this.grounded = false;
+    }
+  }
+
+
+  draw() {
+
+    push();
+
+
+    translate(
+      this.x - cameraX,
+      this.y
+    );
+
+
+    // ダメージ中
+    if (
+      this.invincible &gt; 0 &amp;&amp;
+      frameCount % 6 &lt; 3
+    ) {
+
+      pop();
+
+      return;
+    }
+
+
+    // スター
+    if (
+      this.star &gt; 0
+    ) {
+
+      fill(
+        random(255),
+        random(200, 255),
+        0
+      );
+
+      circle(
+        16,
+        25,
+        70
+      );
+    }
+
+
+    let h =
+      this.big
+        ? 60
+        : 48;
+
+
+    // 帽子
+    fill(&quot;#e52521&quot;);
+
+    rect(
+      5,
+      0,
+      25,
+      10,
+      5
+    );
+
+
+    // 顔
+    fill(&quot;#ffc27d&quot;);
+
+    rect(
+      7,
+      8,
+      23,
+      20,
+      5
+    );
+
+
+    // 目
+    fill(&quot;#222&quot;);
+
+    rect(
+      22,
+      13,
+      3,
+      5
+    );
+
+
+    // 服
+    fill(&quot;#2468d7&quot;);
+
+    rect(
+      5,
+      28,
+      25,
+      h - 28,
+      5
+    );
+
+
+    // 手
+    fill(&quot;#ffc27d&quot;);
+
+    rect(
+      0,
+      30,
+      7,
+      18,
+      4
+    );
+
+    rect(
+      30,
+      30,
+      7,
+      18,
+      4
+    );
+
+
+    // 靴
+    fill(&quot;#713b1d&quot;);
+
+    rect(
+      3,
+      h - 5,
+      13,
+      8,
+      3
+    );
+
+    rect(
+      20,
+      h - 5,
+      13,
+      8,
+      3
+    );
+
+
+    pop();
+  }
+}
+
+
+// ==========================================
+// 足場
+// ==========================================
+
+class Platform {
+
+  constructor(
+    x,
+    y,
+    w,
+    h
+  ) {
+
+    this.x = x;
+    this.y = y;
+
+    this.w = w;
+    this.h = h;
+  }
+
+
+  draw() {
+
+    fill(&quot;#99582c&quot;);
+
+    rect(
+      this.x - cameraX,
+      this.y,
+      this.w,
+      this.h
+    );
+
+
+    fill(&quot;#58ad3e&quot;);
+
+    rect(
+      this.x - cameraX,
+      this.y,
+      this.w,
+      8
+    );
+  }
+}
+
+
+// ==========================================
+// ？ブロック
+// ==========================================
+
+class QuestionBlock {
+
+  constructor(x, y) {
+
+    this.x = x;
+    this.y = y;
+
+    this.w = 45;
+    this.h = 45;
+
+    this.used = false;
+
+    this.bump = 0;
+  }
+
+
+  draw() {
+
+    if (
+      this.bump &gt; 0
+    ) {
+
+      this.bump--;
+    }
+
+
+    let y =
+      this.y - this.bump;
+
+
+    fill(
+      this.used
+        ? &quot;#888&quot;
+        : &quot;#e89b32&quot;
+    );
+
+
+    stroke(&quot;#9b5b1b&quot;);
+
+    rect(
+      this.x - cameraX,
+      y,
+      this.w,
+      this.h
+    );
+
+
+    noStroke();
+
+
+    if (!this.used) {
+
+      fill(&quot;#fff2a0&quot;);
+
+      textAlign(
+        CENTER,
+        CENTER
+      );
+
+      textSize(28);
+
+      text(
+        &quot;?&quot;,
+        this.x -
+        cameraX +
+        22,
+        y + 22
+      );
+    }
+  }
+}
+
+
+// ==========================================
+// 敵
+// ==========================================
+
+class Enemy {
+
+  constructor(
+    x,
+    y,
+    speed
+  ) {
+
+    this.x = x;
+    this.y = y;
+
+    this.w = 34;
+    this.h = 32;
+
+    this.vx = speed;
+
+    this.dead = false;
+  }
+
+
+  update() {
+
+    if (this.dead) {
+      return;
+    }
+
+
+    this.x += this.vx;
+
+
+    // 壁のように端で反転
+    if (
+      this.x &lt; 0 ||
+      this.x &gt; 3900
+    ) {
+
+      this.vx *= -1;
+    }
+  }
+
+
+  draw() {
+
+    if (this.dead) {
+      return;
+    }
+
+
+    let x =
+      this.x - cameraX;
+
+
+    fill(&quot;#8b451f&quot;);
+
+    ellipse(
+      x + 17,
+      this.y + 17,
+      34,
+      30
+    );
+
+
+    fill(&quot;white&quot;);
+
+    rect(
+      x + 8,
+      this.y + 8,
+      7,
+      8
+    );
+
+    rect(
+      x + 20,
+      this.y + 8,
+      7,
+      8
+    );
+
+
+    fill(&quot;#222&quot;);
+
+    rect(
+      x + 11,
+      this.y + 10,
+      3,
+      4
+    );
+
+    rect(
+      x + 23,
+      this.y + 10,
+      3,
+      4
+    );
+  }
+}
+
+
+// ==========================================
+// アイテム
+// ==========================================
+
+class Item {
+
+  constructor(
+    x,
+    y,
+    type
+  ) {
+
+    this.x = x;
+    this.y = y;
+
+    this.type = type;
+
+    this.w = 30;
+    this.h = 30;
+
+    this.vx = 0;
+    this.vy = -6;
+
+    this.active = true;
+  }
+
+
+  update() {
+
+    if (!this.active) {
+      return;
+    }
+
+
+    this.vy += 0.4;
+
+    this.x += this.vx;
+
+    this.y += this.vy;
+
+
+    for (
+      let p of platforms
+    ) {
+
+      if (
+        this.x + this.w &gt; p.x &amp;&amp;
+        this.x &lt; p.x + p.w &amp;&amp;
+        this.y + this.h &gt;= p.y &amp;&amp;
+        this.y + this.h &lt;=
+        p.y + 20 &amp;&amp;
+        this.vy &gt;= 0
+      ) {
+
+        this.y =
+          p.y - this.h;
+
+
+        if (
+          this.type ===
+          &quot;mushroom&quot;
+        ) {
+
+          this.vy = 0;
+
+          if (
+            this.vx === 0
+          ) {
+
+            this.vx = 2;
+          }
+        }
+
+
+        if (
+          this.type === &quot;star&quot;
+        ) {
+
+          this.vy = -8;
+
+          if (
+            this.vx === 0
+          ) {
+
+            this.vx = 2;
+          }
+        }
+      }
+    }
+  }
+
+
+  draw() {
+
+    if (!this.active) {
+      return;
+    }
+
+
+    let x =
+      this.x - cameraX;
+
+
+    // コイン
+    if (
+      this.type === &quot;coin&quot;
+    ) {
+
+      fill(&quot;#ffd21f&quot;);
+
+      ellipse(
+        x + 15,
+        this.y + 15,
+        25,
+        30
+      );
+    }
+
+
+    // キノコ
+    if (
+      this.type === &quot;mushroom&quot;
+    ) {
+
+      fill(&quot;#fff0c2&quot;);
+
+      rect(
+        x + 8,
+        this.y + 15,
+        15,
+        15,
+        4
+      );
+
+
+      fill(&quot;#ef3b3b&quot;);
+
+      arc(
+        x + 15,
+        this.y + 17,
+        32,
+        30,
+        PI,
+        TWO_PI
+      );
+
+
+      fill(&quot;white&quot;);
+
+      circle(
+        x + 8,
+        this.y + 13,
+        8
+      );
+
+      circle(
+        x + 22,
+        this.y + 13,
+        8
+      );
+    }
+
+
+    // スター
+    if (
+      this.type === &quot;star&quot;
+    ) {
+
+      fill(&quot;#ffd21f&quot;);
+
+      drawStar(
+        x + 15,
+        this.y + 15,
+        17,
+        8
+      );
+    }
+  }
+}
+
+
+// ==========================================
+// 星
+// ==========================================
+
+function drawStar(
+  x,
+  y,
+  r1,
+  r2
+) {
+
+  beginShape();
+
+  for (
+    let i = 0;
+    i &lt; 10;
+    i++
+  ) {
+
+    let a =
+      -PI / 2 +
+      i * PI / 5;
+
+    let r =
+      i % 2 === 0
+        ? r1
+        : r2;
+
+    vertex(
+      x + cos(a) * r,
+      y + sin(a) * r
+    );
+  }
+
+  endShape(CLOSE);
+}
+
+
+// ==========================================
+// 足場判定
+// ==========================================
+
+function checkPlatforms() {
+
+  player.grounded = false;
+
+
+  for (
+    let p of platforms
+  ) {
+
+    if (
+      player.vy &gt;= 0 &amp;&amp;
+      player.x + player.w &gt; p.x &amp;&amp;
+      player.x &lt; p.x + p.w &amp;&amp;
+      player.y + player.h &gt;= p.y &amp;&amp;
+      player.y + player.h &lt;=
+      p.y + 25
+    ) {
+
+      player.y =
+        p.y - player.h;
+
+      player.vy = 0;
+
+      player.grounded = true;
+    }
+  }
+}
+
+
+// ==========================================
+// ブロック判定
+// ==========================================
+
+function checkBlocks() {
+
+  for (
+    let b of blocks
+  ) {
+
+    if (b.used) {
+      continue;
+    }
+
+
+    if (
+      player.x + player.w &gt; b.x &amp;&amp;
+      player.x &lt; b.x + b.w &amp;&amp;
+      player.y &lt; b.y + b.h &amp;&amp;
+      player.y + player.h &gt; b.y
+    ) {
+
+
+      // 下から叩く
+      if (
+        player.vy &lt; 0 &amp;&amp;
+        player.y &gt; b.y
+      ) {
+
+        b.used = true;
+
+        b.bump = 10;
+
+        player.y =
+          b.y + b.h;
+
+        player.vy = 1;
+
+        score += 50;
+
+        createItem(b);
+      }
+    }
+  }
+}
+
+
+// ==========================================
+// アイテム
+// ==========================================
+
+function createItem(block) {
+
+  let r = random();
+
+  let type;
+
+
+  if (r &lt; 0.5) {
+
+    type = &quot;coin&quot;;
+
+  } else if (r &lt; 0.8) {
+
+    type = &quot;mushroom&quot;;
+
+  } else {
+
+    type = &quot;star&quot;;
+  }
+
+
+  let item =
+    new Item(
+      block.x + 7,
+      block.y - 30,
+      type
+    );
+
+
+  if (
+    type === &quot;mushroom&quot; ||
+    type === &quot;star&quot;
+  ) {
+
+    item.vx = 2;
+  }
+
+
+  items.push(item);
+}
+
+
+// ==========================================
+// コイン判定
+// ==========================================
+
+function checkCoins() {
+
+  for (
+    let c of coins
+  ) {
+
+    if (c.taken) {
+      continue;
+    }
+
+
+    let d =
+      dist(
+        player.x + 16,
+        player.y + 24,
+        c.x,
+        c.y
+      );
+
+
+    if (d &lt; 35) {
+
+      c.taken = true;
+
+      score += 100;
+    }
+  }
+}
+
+
+// ==========================================
+// アイテム取得
+// ==========================================
+
+function checkItems() {
+
+  for (
+    let item of items
+  ) {
+
+    if (!item.active) {
+      continue;
+    }
+
+
+    if (
+      player.x &lt;
+      item.x + item.w &amp;&amp;
+      player.x + player.w &gt;
+      item.x &amp;&amp;
+      player.y &lt;
+      item.y + item.h &amp;&amp;
+      player.y + player.h &gt;
+      item.y
+    ) {
+
+
+      if (
+        item.type === &quot;coin&quot;
+      ) {
+
+        score += 100;
+
+        item.active = false;
+      }
+
+
+      if (
+        item.type === &quot;mushroom&quot;
+      ) {
+
+        player.big = true;
+
+        score += 500;
+
+        item.active = false;
+      }
+
+
+      if (
+        item.type === &quot;star&quot;
+      ) {
+
+        player.star = 600;
+
+        score += 1000;
+
+        item.active = false;
+      }
+    }
+  }
+}
+
+
+// ==========================================
+// 敵判定
+// ==========================================
+
+function checkEnemies() {
+
+  for (
+    let enemy of enemies
+  ) {
+
+    if (enemy.dead) {
+      continue;
+    }
+
+
+    if (
+      player.x &lt;
+      enemy.x + enemy.w &amp;&amp;
+      player.x + player.w &gt;
+      enemy.x &amp;&amp;
+      player.y &lt;
+      enemy.y + enemy.h &amp;&amp;
+      player.y + player.h &gt;
+      enemy.y
+    ) {
+
+
+      // 踏む
+      if (
+        player.vy &gt; 0 &amp;&amp;
+        player.y + player.h &lt;
+        enemy.y + 18
+      ) {
+
+        enemy.dead = true;
+
+        player.vy = -8;
+
+        score += 200;
+
+        continue;
+      }
+
+
+      // スター
+      if (
+        player.star &gt; 0
+      ) {
+
+        enemy.dead = true;
+
+        score += 200;
+
+        continue;
+      }
+
+
+      damage();
+    }
+  }
+}
+
+
+// ==========================================
+// ダメージ
+// ==========================================
+
+function damage() {
+
+  if (
+    player.invincible &gt; 0
+  ) {
+    return;
+  }
+
+
+  lives--;
+
+
+  if (lives &lt;= 0) {
+
+    gameState = &quot;gameover&quot;;
+
+    return;
+  }
+
+
+  player.x =
+    max(
+      50,
+      player.x - 300
+    );
+
+  player.y = 250;
+
+  player.vx = 0;
+  player.vy = 0;
+
+  player.invincible = 120;
+}
+
+
+// ==========================================
+// 描画
+// ==========================================
+
+function drawWorld() {
+
+  for (
+    let p of platforms
+  ) {
+
+    p.draw();
+  }
+
+
+  for (
+    let b of blocks
+  ) {
+
+    b.draw();
+  }
+
+
+  drawCoins();
+
+
+  for (
+    let item of items
+  ) {
+
+    item.draw();
+  }
+
+
+  for (
+    let enemy of enemies
+  ) {
+
+    enemy.draw();
+  }
+
+
+  drawGoal();
+
+  player.draw();
+}
+
+
+// ==========================================
+// コイン描画
+// ==========================================
+
+function drawCoins() {
+
+  for (
+    let c of coins
+  ) {
+
+    if (c.taken) {
+      continue;
+    }
+
+
+    c.angle += 0.1;
+
+
+    let w =
+      abs(
+        sin(c.angle)
+      ) * 15 + 5;
+
+
+    fill(&quot;#ffd21f&quot;);
+
+    ellipse(
+      c.x - cameraX,
+      c.y,
+      w,
+      28
+    );
+  }
+}
+
+
+// ==========================================
+// ゴール
+// ==========================================
+
+function drawGoal() {
+
+  let x =
+    player.goalX - cameraX;
+
+
+  stroke(&quot;#555&quot;);
+
+  strokeWeight(5);
+
+  line(
+    x,
+    220,
+    x,
+    400
+  );
+
+
+  noStroke();
+
+  fill(&quot;#ff3333&quot;);
+
+  triangle(
+    x,
+    220,
+    x + 70,
+    250,
+    x,
+    280
+  );
+}
+
+
+// ==========================================
+// 背景
+// ==========================================
+
+function drawBackground() {
+
+  background(&quot;#78cfff&quot;);
+
+  noStroke();
+
+
+  // レベルが上がるほど空の色を変える
+  if (level === 2) {
+    background(&quot;#66c8ee&quot;);
+  }
+
+  if (level === 3) {
+    background(&quot;#55bce5&quot;);
+  }
+
+  if (level === 4) {
+    background(&quot;#469fc9&quot;);
+  }
+
+  if (level === 5) {
+    background(&quot;#253b75&quot;);
+  }
+
+
+  // 雲
+  fill(
+    level === 5
+      ? &quot;#aaaacc&quot;
+      : &quot;white&quot;
+  );
+
+
+  drawCloud(100, 80);
+  drawCloud(500, 120);
+  drawCloud(1000, 70);
+  drawCloud(1600, 100);
+  drawCloud(2300, 80);
+  drawCloud(3000, 110);
+}
+
+
+function drawCloud(x, y) {
+
+  ellipse(
+    x,
+    y,
+    70,
+    40
+  );
+
+  ellipse(
+    x + 35,
+    y - 15,
+    60,
+    45
+  );
+
+  ellipse(
+    x + 70,
+    y,
+    70,
+    40
+  );
+}
+
+
+// ==========================================
+// UI
+// ==========================================
+
+function drawUI() {
+
+  fill(&quot;white&quot;);
+
+  stroke(&quot;#333&quot;);
+
+  strokeWeight(2);
+
+  rect(
+    15,
+    15,
+    350,
+    65,
+    10
+  );
+
+
+  noStroke();
+
+  fill(&quot;#222&quot;);
+
+  textAlign(
+    LEFT,
+    CENTER
+  );
+
+  textSize(18);
+
+  text(
+    &quot;LEVEL: &quot; + level + &quot; / 5&quot;,
+    30,
+    35
+  );
+
+  text(
+    &quot;SCORE: &quot; + score,
+    30,
+    60
+  );
+
+  text(
+    &quot;❤️ &quot; + lives,
+    250,
+    47
+  );
+}
+
+
+// ==========================================
+// レベルクリア
+// ==========================================
+
+function drawLevelClear() {
+
+  fill(
+    0,
+    0,
+    0,
+    190
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  fill(&quot;#ffd21f&quot;);
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(52);
+
+  text(
+    &quot;LEVEL &quot; + level + &quot; CLEAR!&quot;,
+    width / 2,
+    height / 2 - 35
+  );
+
+
+  fill(&quot;white&quot;);
+
+  textSize(22);
+
+
+  if (level &lt; 5) {
+
+    text(
+      &quot;ENTERでLEVEL &quot; +
+      (level + 1) +
+      &quot;へ！&quot;,
+      width / 2,
+      height / 2 + 35
+    );
+
+  } else {
+
+    text(
+      &quot;ENTERで完全クリア！&quot;,
+      width / 2,
+      height / 2 + 35
+    );
+  }
+}
+
+
+// ==========================================
+// GAME OVER
+// ==========================================
+
+function drawGameOver() {
+
+  fill(
+    0,
+    0,
+    0,
+    200
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  fill(&quot;#ff4444&quot;);
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(55);
+
+  text(
+    &quot;GAME OVER&quot;,
+    width / 2,
+    height / 2 - 30
+  );
+
+
+  fill(&quot;white&quot;);
+
+  textSize(20);
+
+  text(
+    &quot;Rキーで最初から&quot;,
+    width / 2,
+    height / 2 + 40
+  );
+}
+
+
+// ==========================================
+// 完全クリア
+// ==========================================
+
+function drawAllClear() {
+
+  fill(
+    0,
+    0,
+    0,
+    220
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  fill(&quot;#ffd21f&quot;);
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(65);
+
+  text(
+    &quot;ALL CLEAR!&quot;,
+    width / 2,
+    height / 2 - 45
+  );
+
+
+  fill(&quot;white&quot;);
+
+  textSize(25);
+
+  text(
+    &quot;5 LEVELS COMPLETE!&quot;,
+    width / 2,
+    height / 2 + 20
+  );
+
+
+  textSize(18);
+
+  text(
+    &quot;Rキーでもう一度&quot;,
+    width / 2,
+    height / 2 + 65
+  );
+}
+
+
+// ==========================================
+// キーボード
+// ==========================================
+
+function keyPressed() {
+
+  // ジャンプ
+  if (
+    keyCode === UP_ARROW ||
+    key === &quot; &quot;
+  ) {
+
+    if (
+      gameState === &quot;play&quot;
+    ) {
+
+      player.jump();
+    }
+
+    return false;
+  }
+
+
+  // 次のレベル
+  if (
+    keyCode === ENTER &amp;&amp;
+    gameState === &quot;levelClear&quot;
+  ) {
+
+    if (level &lt; 5) {
+
+      startLevel(level + 1);
+
+    } else {
+
+      gameState = &quot;allClear&quot;;
+    }
+
+    return false;
+  }
+
+
+  // リスタート
+  if (
+    key === &quot;r&quot; ||
+    key === &quot;R&quot;
+  ) {
+
+    score = 0;
+
+    lives = 3;
+
+    startLevel(1);
+
+    return false;
+  }
+}
+
+
+// ==========================================
+// マウス
+// ==========================================
+
+function mousePressed() {
+
+  if (
+    gameState === &quot;play&quot;
+  ) {
+
+    player.jump();
+
+    return;
+  }
+
+
+  if (
+    gameState === &quot;levelClear&quot;
+  ) {
+
+    if (level &lt; 5) {
+
+      startLevel(level + 1);
+
+    } else {
+
+      gameState = &quot;allClear&quot;;
+    }
+
+    return;
+  }
+
+
+  if (
+    gameState === &quot;gameover&quot; ||
+    gameState === &quot;allClear&quot;
+  ) {
+
+    score = 0;
+
+    lives = 3;
+
+    startLevel(1);
+  }
+}
+</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>
