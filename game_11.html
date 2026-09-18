@@ -12,35 +12,44 @@
       background: #121212;
       color: #fff;
       font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .header-group {
+      order: 1;
       text-align: center;
+      margin-bottom: 20px;
     }
     h1 {
       font-size: 1.2rem;
-      margin-bottom: 5px;
+      margin: 10px 0 5px 0;
     }
     p {
       color: #aaa;
-      margin-bottom: 20px;
+      margin: 0;
     }
     .back-link {
       display: inline-block;
-      margin-bottom: 20px;
       color: #4fc3f7;
       text-decoration: none;
+      font-size: 0.95rem;
     }
     .back-link:hover {
       text-decoration: underline;
     }
-    #game-container {
-      display: flex;
-      justify-content: center;
-      margin-bottom: 40px;
-    }
-    #game-container canvas {
+    /* canvasがどこに挿入されても確実に2番目（中央）に配置する */
+    canvas, #defaultCanvas0 {
+      order: 2 !important;
+      margin: 10px auto 40px auto !important;
+      display: block !important;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       border-radius: 4px;
     }
+    /* ソースコード枠は確実に3番目（一番下）に配置する */
     .code-container {
+      order: 3 !important;
+      width: 100%;
       max-width: 800px;
       margin: 0 auto 40px auto;
       text-align: left;
@@ -95,14 +104,12 @@
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 一覧に戻る</a>
-  <h1>作者: 敷地</h1>
-  <p>aim insanity</p>
-  
-  <!-- ゲーム画面を配置する領域 -->
-  <div id="game-container"></div>
+  <div class="header-group">
+    <a href="index.html" class="back-link">← 一覧に戻る</a>
+    <h1>作者: 敷地</h1>
+    <p>aim insanity</p>
+  </div>
 
-  <!-- ソースコード表示領域（ゲーム画面の下） -->
   <div class="code-container">
     <div class="code-header">
       <span>ソースコード</span>
@@ -411,7 +418,6 @@ function draw() {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 
   <script>
-    // コピー機能の実装
     const copyBtn = document.getElementById("copy-btn");
     const copyIcon = document.getElementById("copy-icon");
     const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
@@ -428,20 +434,6 @@ function draw() {
         }, 2000);
       });
     });
-
-    // 生成されたキャンバスを #game-container の中に格納する
-    function ensureCanvasInContainer() {
-      const container = document.getElementById("game-container");
-      const canvas = document.querySelector("canvas");
-      if (canvas && canvas.parentElement !== container) {
-        container.appendChild(canvas);
-      }
-    }
-    const canvasObserver = new MutationObserver(function() {
-      ensureCanvasInContainer();
-    });
-    canvasObserver.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener("load", ensureCanvasInContainer);
   </script>
 
   <!-- 生徒のゲームスクリプト -->
