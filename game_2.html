@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>手嶋　章斗さんのゲーム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <style>
+    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
+    h1 { font-size: 1.2rem; margin-bottom: 5px; }
+    p { color: #aaa; margin-bottom: 20px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← 回覧板に戻る</a>
+  <h1>手嶋　章斗 (4年 番号:4)</h1>
+  <p>クリックしてゾンビを倒すサバイバルゲーム</p>
+  <script>// ========================================
+// ゾンビサバイバル Ver.4
+// 超大量ゾンビ・高HPバージョン
+// ========================================
+
+
+// ========================================
+// プレイヤー
+// ========================================
+
+let player = {
+  x: 400,
+  y: 300,
+
+  speed: 4,
+  radius: 20,
+
+  hp: 100,
+  maxHp: 100
+};
+
+
+// ========================================
+// ゲーム
+// ========================================
+
+let bullets = [];
+let zombies = [];
+
+let score = 0;
+
+let gameTime = 0;
+let spawnTimer = 0;
+
+let gameState = "playing";
+
+
+// ========================================
+// setup
+// ========================================
+
+function setup() {
+
+  createCanvas(800, 600);
+
+  textAlign(CENTER, CENTER);
+
+  // 最初から5体
+  for (let i = 0; i < 5; i++) {
+    spawnZombie();
+  }
+}
+
+
+// ========================================
+// draw
+// ========================================
+
+function draw() {
+
+  background("#263238");
+
+
+  // ========================================
+  // ゲーム中
+  // ========================================
+
+  if (gameState === "playing") {
+
+    gameTime++;
+
+
+    // プレイヤー
+    updatePlayer();
+
+
+    // 弾
+    updateBullets();
+
+
+    // ゾンビ
+    updateZombies();
+
+
+    // 当たり判定
+    checkBulletZombieCollision();
+
+    checkPlayerZombieCollision();
+
+
+    // ========================================
+    // ゾンビ大量発生
+    // ========================================
+
+    spawnTimer++;
+
+
+    // 秒数
+    let seconds =
+      floor(gameTime / 60);
+
+
+    // --------------------
+    // スポーン間隔
+    // どんどん短くする
+    // --------------------
+
+    let spawnInterval =
+      max(
+        8,
+        55 - seconds * 2
+      );
+
+
+    if (spawnTimer >= spawnInterval) {
+
+
+      // --------------------
+      // 一度に出す数
+      // --------------------
+
+      let spawnCount =
+        min(
+          2 + floor(seconds / 5),
+          15
+        );
+
+
+      for (
+        let i = 0;
+        i < spawnCount;
+        i++
+      ) {
+
+        spawnZombie();
+      }
+
+
+      spawnTimer = 0;
+    }
+  }
+
+
+  // ========================================
+  // 描画
+  // ========================================
+
+  drawArena();
+
+  drawBullets();
+
+  drawZombies();
+
+  drawPlayer();
+
+  drawUI();
+
+
+  // ========================================
+  // GAME OVER
+  // ========================================
+
+  if (gameState === "gameover") {
+
+    drawGameOver();
+  }
+}
+
+
+// ========================================
+// プレイヤー更新
+// ========================================
+
+function updatePlayer() {
+
+  let dx = 0;
+  let dy = 0;
+
+
+  // W
+  if (keyIsDown(87)) {
+    dy -= 1;
+  }
+
+
+  // S
+  if (keyIsDown(83)) {
+    dy += 1;
+  }
+
+
+  // A
+  if (keyIsDown(65)) {
+    dx -= 1;
+  }
+
+
+  // D
+  if (keyIsDown(68)) {
+    dx += 1;
+  }
+
+
+  // 斜め移動
+  if (dx !== 0 || dy !== 0) {
+
+    let length =
+      sqrt(
+        dx * dx +
+        dy * dy
+      );
+
+    dx /= length;
+    dy /= length;
+
+    player.x +=
+      dx * player.speed;
+
+    player.y +=
+      dy * player.speed;
+  }
+
+
+  // 画面外に出ない
+  player.x = constrain(
+    player.x,
+    player.radius,
+    width - player.radius
+  );
+
+  player.y = constrain(
+    player.y,
+    player.radius,
+    height - player.radius
+  );
+}
+
+
+// ========================================
+// プレイヤー描画
+// ========================================
+
+function drawPlayer() {
+
+  push();
+
+  translate(
+    player.x,
+    player.y
+  );
+
+
+  // マウス方向
+  let angle =
+    atan2(
+      mouseY - player.y,
+      mouseX - player.x
+    );
+
+
+  rotate(angle);
+
+
+  // 体
+  noStroke();
+
+  fill("#3498db");
+
+  ellipse(
+    0,
+    0,
+    40,
+    40
+  );
+
+
+  // 顔
+  fill("#FFCCBC");
+
+  ellipse(
+    5,
+    0,
+    25,
+    25
+  );
+
+
+  // 銃
+  fill("#212121");
+
+  rect(
+    10,
+    -5,
+    30,
+    10,
+    3
+  );
+
+
+  // 銃口
+  fill("#555");
+
+  rect(
+    35,
+    -3,
+    10,
+    6
+  );
+
+
+  pop();
+}
+
+
+// ========================================
+// 射撃
+// ========================================
+
+function mousePressed() {
+
+  if (
+    gameState !==
+    "playing"
+  ) {
+    return;
+  }
+
+
+  // マウス方向
+  let angle =
+    atan2(
+      mouseY - player.y,
+      mouseX - player.x
+    );
+
+
+  // 弾速
+  let speed = 10;
+
+
+  let bullet = {
+
+    x: player.x,
+    y: player.y,
+
+    vx:
+      cos(angle) *
+      speed,
+
+    vy:
+      sin(angle) *
+      speed,
+
+    radius: 5,
+
+    bounceCount: 0
+  };
+
+
+  bullets.push(
+    bullet
+  );
+}
+
+
+// ========================================
+// 弾更新
+// ========================================
+
+function updateBullets() {
+
+  for (
+    let bullet of bullets
+  ) {
+
+
+    bullet.x +=
+      bullet.vx;
+
+    bullet.y +=
+      bullet.vy;
+
+
+    // --------------------
+    // 左右の壁
+    // --------------------
+
+    if (
+      bullet.x -
+        bullet.radius <= 0 ||
+
+      bullet.x +
+        bullet.radius >= width
+    ) {
+
+      bullet.vx *= -1;
+
+      bullet.x =
+        constrain(
+          bullet.x,
+          bullet.radius,
+          width -
+            bullet.radius
+        );
+
+      bullet.bounceCount++;
+    }
+
+
+    // --------------------
+    // 上下の壁
+    // --------------------
+
+    if (
+      bullet.y -
+        bullet.radius <= 0 ||
+
+      bullet.y +
+        bullet.radius >= height
+    ) {
+
+      bullet.vy *= -1;
+
+      bullet.y =
+        constrain(
+          bullet.y,
+          bullet.radius,
+          height -
+            bullet.radius
+        );
+
+      bullet.bounceCount++;
+    }
+  }
+}
+
+
+// ========================================
+// 弾描画
+// ========================================
+
+function drawBullets() {
+
+  noStroke();
+
+
+  for (
+    let bullet of bullets
+  ) {
+
+
+    // 反射回数で色を変える
+
+    if (
+      bullet.bounceCount < 3
+    ) {
+
+      fill("#FFD700");
+
+    }
+
+    else if (
+      bullet.bounceCount < 6
+    ) {
+
+      fill("#FF9800");
+
+    }
+
+    else {
+
+      fill("#FF1744");
+    }
+
+
+    ellipse(
+      bullet.x,
+      bullet.y,
+      bullet.radius * 2
+    );
+  }
+}
+
+
+// ========================================
+// ゾンビ生成
+// ========================================
+
+function spawnZombie() {
+
+  let side =
+    floor(
+      random(4)
+    );
+
+
+  let x;
+  let y;
+
+
+  // 上
+  if (side === 0) {
+
+    x = random(width);
+    y = -30;
+
+  }
+
+
+  // 右
+  else if (side === 1) {
+
+    x = width + 30;
+    y = random(height);
+
+  }
+
+
+  // 下
+  else if (side === 2) {
+
+    x = random(width);
+    y = height + 30;
+
+  }
+
+
+  // 左
+  else {
+
+    x = -30;
+    y = random(height);
+  }
+
+
+  // ========================================
+  // 時間による強化
+  // ========================================
+
+  let seconds =
+    floor(gameTime / 60);
+
+
+  // --------------------
+  // 移動速度
+  // --------------------
+
+  let zombieSpeed =
+    random(
+      0.9,
+      1.6
+    );
+
+
+  // 時間が経つほど速く
+  zombieSpeed +=
+    min(
+      seconds * 0.025,
+      2.5
+    );
+
+
+  // --------------------
+  // HP
+  // --------------------
+
+  // 基本HP 50
+  // 15秒ごとに+20
+  let zombieHP =
+    50 +
+    floor(
+      seconds / 15
+    ) * 20;
+
+
+  // 最大HPはかなり高くなる
+  zombieHP =
+    min(
+      zombieHP,
+      300
+    );
+
+
+  // ========================================
+  // ゾンビ
+  // ========================================
+
+  let zombie = {
+
+    x: x,
+    y: y,
+
+    radius: 22,
+
+    speed: zombieSpeed,
+
+    hp: zombieHP,
+
+    maxHp: zombieHP,
+
+    hitTimer: 0
+  };
+
+
+  zombies.push(
+    zombie
+  );
+}
+
+
+// ========================================
+// ゾンビ更新
+// ========================================
+
+function updateZombies() {
+
+  for (
+    let zombie of zombies
+  ) {
+
+
+    // プレイヤー方向
+    let dx =
+      player.x -
+      zombie.x;
+
+    let dy =
+      player.y -
+      zombie.y;
+
+
+    let distance =
+      sqrt(
+        dx * dx +
+        dy * dy
+      );
+
+
+    if (
+      distance > 0
+    ) {
+
+      dx /= distance;
+      dy /= distance;
+
+
+      zombie.x +=
+        dx *
+        zombie.speed;
+
+      zombie.y +=
+        dy *
+        zombie.speed;
+    }
+
+
+    // ダメージ演出
+    if (
+      zombie.hitTimer > 0
+    ) {
+
+      zombie.hitTimer--;
+    }
+  }
+}
+
+
+// ========================================
+// ゾンビ描画
+// ========================================
+
+function drawZombies() {
+
+  for (
+    let zombie of zombies
+  ) {
+
+
+    push();
+
+    translate(
+      zombie.x,
+      zombie.y
+    );
+
+
+    // ダメージ中
+    if (
+      zombie.hitTimer > 0
+    ) {
+
+      fill("#FFFFFF");
+
+    }
+
+    else {
+
+      fill("#66BB6A");
+    }
+
+
+    noStroke();
+
+
+    // 体
+    ellipse(
+      0,
+      0,
+      zombie.radius * 2
+    );
+
+
+    // 目
+    fill("#FF0000");
+
+    ellipse(
+      -7,
+      -5,
+      6,
+      6
+    );
+
+    ellipse(
+      7,
+      -5,
+      6,
+      6
+    );
+
+
+    // 口
+    stroke("#263238");
+
+    strokeWeight(3);
+
+    line(
+      -8,
+      7,
+      8,
+      7
+    );
+
+
+    pop();
+
+
+    // HPバー
+    drawZombieHP(
+      zombie
+    );
+  }
+}
+
+
+// ========================================
+// ゾンビHPバー
+// ========================================
+
+function drawZombieHP(
+  zombie
+) {
+
+  let barWidth = 45;
+  let barHeight = 6;
+
+
+  let hpRate =
+    zombie.hp /
+    zombie.maxHp;
+
+
+  noStroke();
+
+
+  // 背景
+  fill("#222");
+
+  rect(
+    zombie.x -
+      barWidth / 2,
+
+    zombie.y - 34,
+
+    barWidth,
+    barHeight
+  );
+
+
+  // HP
+  fill("#E53935");
+
+  rect(
+    zombie.x -
+      barWidth / 2,
+
+    zombie.y - 34,
+
+    barWidth *
+      hpRate,
+
+    barHeight
+  );
+}
+
+
+// ========================================
+// 弾とゾンビ
+// ========================================
+
+function checkBulletZombieCollision() {
+
+  for (
+    let i =
+      bullets.length - 1;
+
+    i >= 0;
+
+    i--
+  ) {
+
+
+    let bullet =
+      bullets[i];
+
+
+    for (
+      let j =
+        zombies.length - 1;
+
+      j >= 0;
+
+      j--
+    ) {
+
+
+      let zombie =
+        zombies[j];
+
+
+      let distance =
+        dist(
+          bullet.x,
+          bullet.y,
+
+          zombie.x,
+          zombie.y
+        );
+
+
+      // 命中
+      if (
+        distance <
+        bullet.radius +
+        zombie.radius
+      ) {
+
+
+        // ダメージ
+        zombie.hp -= 10;
+
+
+        // ダメージ演出
+        zombie.hitTimer = 6;
+
+
+        // --------------------
+        // 死亡
+        // --------------------
+
+        if (
+          zombie.hp <= 0
+        ) {
+
+          zombies.splice(
+            j,
+            1
+          );
+
+          score += 100;
+        }
+
+
+        // 同じフレームで
+        // 複数のゾンビに当てない
+        break;
+      }
+    }
+  }
+}
+
+
+// ========================================
+// プレイヤーとゾンビ
+// ========================================
+
+function checkPlayerZombieCollision() {
+
+  for (
+    let zombie of zombies
+  ) {
+
+
+    let distance =
+      dist(
+        player.x,
+        player.y,
+
+        zombie.x,
+        zombie.y
+      );
+
+
+    if (
+      distance <
+      player.radius +
+      zombie.radius
+    ) {
+
+
+      // ダメージ
+      player.hp -=
+        0.5;
+
+
+      // --------------------
+      // 押し返す
+      // --------------------
+
+      let dx =
+        zombie.x -
+        player.x;
+
+      let dy =
+        zombie.y -
+        player.y;
+
+
+      let length =
+        sqrt(
+          dx * dx +
+          dy * dy
+        );
+
+
+      if (
+        length > 0
+      ) {
+
+        dx /= length;
+        dy /= length;
+
+
+        zombie.x +=
+          dx * 2;
+
+        zombie.y +=
+          dy * 2;
+      }
+
+
+      // --------------------
+      // HP0
+      // --------------------
+
+      if (
+        player.hp <= 0
+      ) {
+
+        player.hp = 0;
+
+        gameState =
+          "gameover";
+      }
+    }
+  }
+}
+
+
+// ========================================
+// アリーナ
+// ========================================
+
+function drawArena() {
+
+  // グリッド
+  stroke(
+    255,
+    255,
+    255,
+    20
+  );
+
+  strokeWeight(1);
+
+
+  for (
+    let x = 0;
+    x < width;
+    x += 40
+  ) {
+
+    line(
+      x,
+      0,
+      x,
+      height
+    );
+  }
+
+
+  for (
+    let y = 0;
+    y < height;
+    y += 40
+  ) {
+
+    line(
+      0,
+      y,
+      width,
+      y
+    );
+  }
+
+
+  // 壁
+  noFill();
+
+  stroke(
+    255,
+    255,
+    255,
+    100
+  );
+
+  strokeWeight(4);
+
+
+  rect(
+    2,
+    2,
+    width - 4,
+    height - 4
+  );
+}
+
+
+// ========================================
+// UI
+// ========================================
+
+function drawUI() {
+
+  // --------------------
+  // HPバー
+  // --------------------
+
+  let barWidth = 250;
+  let barHeight = 25;
+
+
+  fill("#333");
+
+  rect(
+    20,
+    20,
+    barWidth,
+    barHeight,
+    5
+  );
+
+
+  fill("#2ECC71");
+
+  rect(
+    20,
+    20,
+
+    barWidth *
+      (
+        player.hp /
+        player.maxHp
+      ),
+
+    barHeight,
+
+    5
+  );
+
+
+  // HP文字
+  fill(255);
+
+  noStroke();
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(16);
+
+  text(
+    "HP " +
+      floor(player.hp),
+
+    145,
+    33
+  );
+
+
+  // --------------------
+  // スコア
+  // --------------------
+
+  textAlign(
+    RIGHT,
+    CENTER
+  );
+
+  textSize(22);
+
+  text(
+    "SCORE: " +
+      score,
+
+    width - 25,
+    32
+  );
+
+
+  // --------------------
+  // ゾンビ数
+  // --------------------
+
+  textSize(16);
+
+  text(
+    "ZOMBIES: " +
+      zombies.length,
+
+    width - 25,
+    58
+  );
+
+
+  // --------------------
+  // 時間
+  // --------------------
+
+  let seconds =
+    floor(
+      gameTime / 60
+    );
+
+
+  text(
+    "TIME: " +
+      seconds +
+      " sec",
+
+    width - 25,
+    80
+  );
+
+
+  // --------------------
+  // 現在のゾンビHP
+  // --------------------
+
+  let currentZombieHP =
+    50 +
+    floor(
+      seconds / 15
+    ) * 20;
+
+
+  currentZombieHP =
+    min(
+      currentZombieHP,
+      300
+    );
+
+
+  text(
+    "ZOMBIE HP: " +
+      currentZombieHP,
+
+    width - 25,
+    102
+  );
+
+
+  // --------------------
+  // 操作説明
+  // --------------------
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  fill(
+    255,
+    220
+  );
+
+  textSize(16);
+
+  text(
+    "WASD：移動　マウス：狙う　クリック：射撃",
+
+    width / 2,
+    height - 20
+  );
+}
+
+
+// ========================================
+// GAME OVER
+// ========================================
+
+function drawGameOver() {
+
+  // 暗くする
+  noStroke();
+
+  fill(
+    0,
+    0,
+    0,
+    180
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  // GAME OVER
+  fill("#FF4444");
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(70);
+
+  text(
+    "GAME OVER",
+
+    width / 2,
+    height / 2 - 80
+  );
+
+
+  // スコア
+  fill(255);
+
+  textSize(28);
+
+  text(
+    "SCORE: " +
+      score,
+
+    width / 2,
+    height / 2
+  );
+
+
+  // 生存時間
+  let seconds =
+    floor(
+      gameTime / 60
+    );
+
+
+  textSize(22);
+
+  text(
+    "SURVIVED: " +
+      seconds +
+      " sec",
+
+    width / 2,
+    height / 2 + 40
+  );
+
+
+  // リスタート
+  textSize(18);
+
+  text(
+    "Rキーでリスタート",
+
+    width / 2,
+    height / 2 + 85
+  );
+}
+
+
+// ========================================
+// キー入力
+// ========================================
+
+function keyPressed() {
+
+  if (
+    (key === "r" ||
+      key === "R") &&
+
+    gameState ===
+      "gameover"
+  ) {
+
+    restartGame();
+  }
+}
+
+
+// ========================================
+// リスタート
+// ========================================
+
+function restartGame() {
+
+  // プレイヤー
+  player.x =
+    width / 2;
+
+  player.y =
+    height / 2;
+
+  player.hp =
+    player.maxHp;
+
+
+  // リセット
+  bullets = [];
+
+  zombies = [];
+
+  score = 0;
+
+  gameTime = 0;
+
+  spawnTimer = 0;
+
+  gameState =
+    "playing";
+
+
+  // 最初から5体
+  for (
+    let i = 0;
+    i < 5;
+    i++
+  ) {
+
+    spawnZombie();
+  }
+}
+</script>
+</body>
+</html>
