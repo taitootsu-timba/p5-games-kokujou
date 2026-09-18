@@ -2,21 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>岩崎脩飛さんのゲーム</title>
+  <title>p5.js ゲーム作品</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
     body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
     h1 { font-size: 1.2rem; margin-bottom: 5px; }
     p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
     .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
+    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 回覧板に戻る</a>
-  <h1>岩崎脩飛 (3年 番号:2)</h1>
+  <a href="index.html" class="back-link">← 一覧に戻る</a>
+  <h1>作者: 岩崎</h1>
   <p>戦車ゲーム　ｗ、ｓ、ｄ、ａで操作</p>
+  
   <script>let tank;
 let bullets = [];
 let dustParticles = []; 
@@ -408,5 +413,404 @@ class WT_Bullet3D {
 
   isExpired() { return this.life <= 0; }
 }</script>
+
+  <div class="code-container">
+    <h3>ソースコード</h3>
+    <pre><code class="language-javascript">let tank;
+let bullets = [];
+let dustParticles = []; 
+let tracks = []; 
+let camAngleX = 0; 
+
+function setup() {
+  createCanvas(800, 600, WEBGL);
+  tank = new OlifantMk2(0, 0);
+}
+
+function draw() {
+  background(160, 200, 240); // 砂漠の快晴の空
+
+  // ライト（強い日光を再現）
+  ambientLight(150);
+  directionalLight(255, 245, 220, 0.6, 0.8, -0.4);
+
+  if (focused) {
+    camAngleX = map(mouseX, 0, width, -PI, PI);
+  }
+
+  // 三人称カメラ
+  let camRadius = 280;
+  let camX = tank.x + sin(camAngleX) * camRadius;
+  let camY = tank.y + cos(camAngleX) * camRadius;
+  let camZ = 120;
+  camera(camX, camY, camZ, tank.x, tank.y, 15, 0, 0, -1);
+
+  // 🌟 軽量化された3D砂漠の地面を描画（バグ対策版）
+  drawLightDesert();
+
+  // 通った跡（履帯痕）の更新と描画
+  drawTankTracks();
+
+  // 砂煙の更新と描画
+  for (let i = dustParticles.length - 1; i &gt;= 0; i--) {
+    dustParticles[i].update();
+    dustParticles[i].display();
+    if (dustParticles[i].isExpired()) dustParticles.splice(i, 1);
+  }
+
+  // 弾の更新と描画
+  for (let i = bullets.length - 1; i &gt;= 0; i--) {
+    bullets[i].update();
+    bullets[i].display();
+    if (bullets[i].isExpired()) bullets.splice(i, 1);
+  }
+
+  // 戦車の更新と描画
+  tank.update(camAngleX);
+  tank.display();
+
+  // 2D UIの表示
+  push();
+  resetMatrix();
+  camera(); 
+  ortho();  
+  drawUI();
+  pop();
+}
+
+// 🌟 軽量な砂漠地面の描画（フリーズ対策）
+function drawLightDesert() {
+  push();
+  noStroke();
+  // 太陽の光を浴びた暖かい砂の色
+  fill(225, 195, 140);
+  // 広大な砂漠の平面を1枚の大きなポリゴンで描画し負荷をゼロに
+  translate(0, 0, -1);
+  plane(4000, 4000);
+  
+  // 砂漠の地平線に薄い模様をつけて距離感を出す（グリッドの代わりに点在する砂目）
+  stroke(205, 175, 120);
+  strokeWeight(2);
+  for (let i = -2000; i &lt;= 2000; i += 200) {
+    line(i, -2000, 0, i, 2000, 0);
+    line(-2000, i, 0, 2000, i, 0);
+  }
+  pop();
+}
+
+// 履帯痕を描画する関数
+function drawTankTracks() {
+  push();
+  stroke(120, 105, 80); // 砂が踏み固められた影の色
+  strokeWeight(3.5);     // キャタピラの幅
+  noFill();
+  
+  for (let t of tracks) {
+    beginShape(LINES);
+    vertex(t.x1, t.y1, t.z1);
+    vertex(t.x2, t.y2, t.z2);
+    endShape();
+  }
+  pop();
+}
+
+function drawUI() {
+  noStroke();
+  fill(0, 160);
+  rect(-width/2 + 20, -height/2 + 20, 320, 80, 5);
+  fill(255);
+  textSize(13);
+  text(&quot;OLIFANT MK2 - South African MBT&quot;, -width/2 + 30, -height/2 + 38);
+  
+  textSize(11);
+  fill(200);
+  text(&quot;A/D: 旋回  /  S: 前進（反転済み）  /  W: 後退&quot;, -width/2 + 30, -height/2 + 54);
+  text(&quot;Fキー(長押し): カメラ方向へ旋回 ＆ 射撃&quot;, -width/2 + 30, -height/2 + 68);
+  
+  let reloadProgress = min(1, tank.reloadTimer / tank.reloadSpeed);
+  fill(reloadProgress === 1 ? color(0, 255, 100) : color(255, 140, 0));
+  rect(-width/2 + 30, -height/2 + 78, 150 * reloadProgress, 8);
+}
+
+// 砂煙クラス
+class DustParticle {
+  constructor(x, y, z, angle, speed) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    let spreadAngle = angle + PI + random(-0.4, 0.4);
+    let pushPower = max(1.0, abs(speed) * 0.5);
+    this.vx = sin(spreadAngle) * pushPower + random(-0.3, 0.3);
+    this.vy = -cos(spreadAngle) * pushPower + random(-0.3, 0.3);
+    this.vz = random(0.4, 1.2);
+    this.size = random(4, 7);  
+    this.maxLife = random(25, 40); 
+    this.life = this.maxLife;
+    this.col = color(225, 195, 140, 180);
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.z += this.vz;
+    this.vx *= 0.93;
+    this.vy *= 0.93;
+    this.vz *= 0.94;
+    this.size += 0.3;
+    this.life--;
+  }
+
+  display() {
+    push();
+    translate(this.x, this.y, this.z);
+    noStroke();
+    let alphaVal = map(this.life, 0, this.maxLife, 0, 130);
+    this.col.setAlpha(alphaVal);
+    fill(this.col);
+    sphere(this.size, 4, 4); 
+    pop();
+  }
+
+  isExpired() { return this.life &lt;= 0; }
+}
+
+// 戦車クラス
+class OlifantMk2 {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.bodyAngle = 0;    
+    this.turretAngle = 0;  
+    
+    this.moveSpeed = 0;
+    this.maxSpeed = 3.5;   
+    this.accel = 0.08;     
+    this.friction = 0.05;  
+    this.rotSpeed = 0.035; 
+    this.turretRotSpeed = 0.025; 
+    
+    this.reloadSpeed = 180; 
+    this.reloadTimer = this.reloadSpeed;
+    this.size = 55;
+
+    this.trackCounter = 0;
+    this.lastLeft = null;
+    this.lastRight = null;
+  }
+
+  update(currentCamAngle) {
+    if (this.reloadTimer &lt; this.reloadSpeed) this.reloadTimer++;
+
+    let keyL = key.toLowerCase();
+    let isMoving = false;
+    
+    if ((keyIsPressed &amp;&amp; (keyL === &#039;a&#039;)) || keyIsDown(LEFT_ARROW)) {
+      this.bodyAngle -= this.rotSpeed;
+      isMoving = true;
+    }
+    if ((keyIsPressed &amp;&amp; (keyL === &#039;d&#039;)) || keyIsDown(RIGHT_ARROW)) {
+      this.bodyAngle += this.rotSpeed;
+      isMoving = true;
+    }
+
+    // Sキーで前進
+    if ((keyIsPressed &amp;&amp; (keyL === &#039;s&#039;)) || keyIsDown(DOWN_ARROW)) {
+      this.moveSpeed = min(this.moveSpeed + this.accel, this.maxSpeed);
+      isMoving = true;
+    } 
+    // Wキーで後退
+    else if ((keyIsPressed &amp;&amp; (keyL === &#039;w&#039;)) || keyIsDown(UP_ARROW)) {
+      this.moveSpeed = max(this.moveSpeed - this.accel, -this.maxSpeed * 0.5);
+      isMoving = true;
+    } 
+    else {
+      if (this.moveSpeed &gt; 0) this.moveSpeed = max(0, this.moveSpeed - this.friction);
+      if (this.moveSpeed &lt; 0) this.moveSpeed = min(0, this.moveSpeed + this.friction);
+    }
+
+    this.x += sin(this.bodyAngle) * this.moveSpeed;
+    this.y -= cos(this.bodyAngle) * this.moveSpeed;
+
+    // 地面の高さ（固定）
+    let terrainZ = 0;
+
+    // キャタピラ位置計算
+    let leftTrackX = this.x + sin(this.bodyAngle - HALF_PI) * (this.size * 0.4);
+    let leftTrackY = this.y - cos(this.bodyAngle - HALF_PI) * (this.size * 0.4);
+    let rightTrackX = this.x + sin(this.bodyAngle + HALF_PI) * (this.size * 0.4);
+    let rightTrackY = this.y - cos(this.bodyAngle + HALF_PI) * (this.size * 0.4);
+
+    // 走行痕と砂煙の生成
+    if (isMoving || abs(this.moveSpeed) &gt; 0.1) {
+      this.trackCounter++;
+      if (this.trackCounter % 3 === 0) {
+        if (this.lastLeft &amp;&amp; this.lastRight) {
+          tracks.push({ x1: this.lastLeft.x, y1: this.lastLeft.y, z1: 0.2, x2: leftTrackX, y2: leftTrackY, z2: 0.2 });
+          tracks.push({ x1: this.lastRight.x, y1: this.lastRight.y, z1: 0.2, x2: rightTrackX, y2: rightTrackY, z2: 0.2 });
+          
+          if (tracks.length &gt; 400) { tracks.shift(); tracks.shift(); } 
+        }
+        this.lastLeft = { x: leftTrackX, y: leftTrackY };
+        this.lastRight = { x: rightTrackX, y: rightTrackY };
+      }
+
+      if (random(1) &lt; 0.5) {
+        dustParticles.push(new DustParticle(leftTrackX, leftTrackY, terrainZ, this.bodyAngle, this.moveSpeed));
+        dustParticles.push(new DustParticle(rightTrackX, rightTrackY, terrainZ, this.bodyAngle, this.moveSpeed));
+      }
+    } else {
+      this.lastLeft = null;
+      this.lastRight = null;
+    }
+
+    // Fキーによる旋回・射撃
+    if (keyIsPressed &amp;&amp; keyL === &#039;f&#039;) { 
+      let targetTurretAngle = currentCamAngle + PI; 
+      let turretAngleDiff = targetTurretAngle - this.turretAngle;
+      while (turretAngleDiff &lt; -PI) turretAngleDiff += TWO_PI;
+      while (turretAngleDiff &gt; PI)  turretAngleDiff -= TWO_PI;
+
+      if (abs(turretAngleDiff) &gt; this.turretRotSpeed) {
+        this.turretAngle += (turretAngleDiff &gt; 0) ? this.turretRotSpeed : -this.turretRotSpeed;
+      } else {
+        this.turretAngle = targetTurretAngle;
+      }
+
+      if (abs(turretAngleDiff) &lt; 0.05) {
+        this.fire();
+      }
+    }
+  }
+
+  display() {
+    push();
+    translate(this.x, this.y, 10); 
+
+    let sandColor = color(135, 115, 90);    
+    let greenColor = color(75, 85, 65);     
+    let darkColor = color(50, 48, 43);      
+
+    // 車体
+    push();
+    rotateZ(this.bodyAngle);
+    fill(sandColor);
+    stroke(40);
+    box(this.size * 0.95, this.size * 1.65, 14); 
+    
+    push();
+    translate(0, this.size * 0.8, 2);
+    rotateX(-0.4); 
+    fill(greenColor); 
+    box(this.size * 0.93, 14, 10);
+    pop();
+
+    for (let offset = -0.7; offset &lt;= 0.7; offset += 0.25) {
+      let segmentColor = (abs(offset) &lt; 0.3) ? greenColor : sandColor;
+      fill(segmentColor);
+      push(); translate(-this.size * 0.52, this.size * offset, -2); box(4, this.size * 0.23, 16); pop();
+      push(); translate(this.size * 0.52, this.size * offset, -2); box(4, this.size * 0.23, 16); pop();
+    }
+    pop();
+
+    // 砲塔
+    push();
+    translate(0, -this.size * 0.05, 12); 
+    rotateZ(this.turretAngle);
+    
+    fill(sandColor);
+    stroke(40);
+    box(this.size * 0.75, this.size * 0.85, 12);
+    
+    fill(greenColor); 
+    push();
+    translate(-this.size * 0.22, this.size * 0.25, 1);
+    rotateZ(0.25);
+    box(14, this.size * 0.55, 12);
+    pop();
+
+    fill(sandColor); 
+    push();
+    translate(this.size * 0.22, this.size * 0.25, 1);
+    rotateZ(-0.25);
+    box(14, this.size * 0.55, 12);
+    pop();
+
+    fill(sandColor);
+    push();
+    translate(0, -this.size * 0.45, 1);
+    box(this.size * 0.6, 12, 10);
+    pop();
+
+    fill(darkColor); 
+    push();
+    translate(-this.size * 0.2, -this.size * 0.05, 10); 
+    box(8, 8, 16); 
+    fill(greenColor);
+    translate(0, 2, 6);
+    box(10, 6, 4);
+    pop();
+
+    // 主砲
+    fill(darkColor); 
+    stroke(30);
+    push();
+    translate(0, this.size * 0.9, 0); 
+    box(4, this.size * 1.1, 4); 
+    
+    translate(0, -this.size * 0.45, 0);
+    fill(greenColor);
+    box(12, 16, 8);
+    pop();
+    
+    pop(); 
+
+    pop();
+  }
+
+  fire() {
+    if (this.reloadTimer &gt;= this.reloadSpeed) {
+      let bX = this.x + sin(this.turretAngle) * (this.size * 1.5);
+      let bY = this.y - cos(this.turretAngle) * (this.size * 1.5);
+      let bZ = 24; 
+      
+      bullets.push(new WT_Bullet3D(bX, bY, bZ, this.turretAngle));
+      this.reloadTimer = 0; 
+    }
+  }
+}
+
+// 3D弾丸クラス
+class WT_Bullet3D {
+  constructor(x, y, z, angle) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.angle = angle;
+    this.speed = 24; 
+    this.life = 80;  
+  }
+
+  update() {
+    this.x += sin(this.angle) * this.speed;
+    this.y -= cos(this.angle) * this.speed;
+    this.life--;
+  }
+
+  display() {
+    push();
+    translate(this.x, this.y, this.z);
+    noStroke();
+    fill(255, 230, 120); 
+    sphere(2); 
+    pop();
+  }
+
+  isExpired() { return this.life &lt;= 0; }
+}</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>
