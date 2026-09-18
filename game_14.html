@@ -109,8 +109,8 @@
   <!-- 1. ヘッダー情報 -->
   <div class="header-group">
     <a href="index.html" class="back-link">← 一覧に戻る</a>
-    <h1>作者: 門田</h1>
-    <p>迷路　重くて動きませんでした</p>
+    <h1>作者: 長澤</h1>
+    <p>よけてください（WAVEを31までがんばってください）</p>
   </div>
 
   <!-- 2. ゲーム画面コンテナ（必ずコード枠の上） -->
@@ -126,944 +126,469 @@
         </svg>
       </button>
     </div>
-    <pre><code id="source-code" class="language-javascript">// ============================================================
-// 3D FPS MAZE
-// p5.js
-// ============================================================
+    <pre><code id="source-code" class="language-javascript">let player;
+let bullets = [];
+let enemyBullets = [];
+let enemies = [];
 
+let score = 0;
+let wave = 1;
+let gameOver = false;
 
-// ============================================================
-// MAZE
-// ============================================================
+let shootTimer = 0;
 
-const maze = [
-  &quot;###############&quot;,
-  &quot;#P            #&quot;,
-  &quot;# ##### ##### #&quot;,
-  &quot;#     #       #&quot;,
-  &quot;##### # #######&quot;,
-  &quot;#     #       #&quot;,
-  &quot;# ### ##### # #&quot;,
-  &quot;# #         # #&quot;,
-  &quot;# # ####### # #&quot;,
-  &quot;# #       #   #&quot;,
-  &quot;# ####### #####&quot;,
-  &quot;#             #&quot;,
-  &quot;###############&quot;
-];
-
-
-// ============================================================
-// SETTINGS
-// ============================================================
-
-const CELL_SIZE = 80;
-const WALL_HEIGHT = 120;
-
-const PLAYER_HEIGHT = 45;
-const PLAYER_RADIUS = 18;
-
-const MOVE_SPEED = 3.5;
-
-const MOUSE_SENSITIVITY = 0.0025;
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-let player = {
-  x: 0,
-  z: 0,
-  angle: 0
-};
-
-
-// ============================================================
-// WALLS
-// ============================================================
-
-let walls = [];
-
-
-// ============================================================
-// SETUP
-// ============================================================
+// ====================
+// セットアップ
+// ====================
 
 function setup() {
+  createCanvas(600, 600);
 
-  createCanvas(
-    windowWidth,
-    windowHeight,
-    WEBGL
-  );
+  player = {
+    x: width / 2,
+    y: height - 60,
+    speed: 6,
+    size: 30
+  };
 
-  createMaze();
-
-  noStroke();
-
+  createWave();
 }
 
+// ====================
+// 敵ウェーブ
+// ====================
 
-// ============================================================
-// CREATE MAZE
-// ============================================================
+function createWave() {
+  enemies = [];
 
-function createMaze() {
+  let rows = min(2 + wave, 7);
+  let cols = 8 + min(wave, 4);
 
-  const mazeWidth =
-    maze[0].length;
+  for (let row = 0; row &lt; rows; row++) {
+    for (let col = 0; col &lt; cols; col++) {
+      enemies.push({
+        x: 50 + col * (500 / (cols - 1)),
+        y: 60 + row * 45,
 
-  const mazeHeight =
-    maze.length;
+        speed: 1.5 + wave * 0.2,
+        size: 32,
 
-
-  const offsetX =
-    mazeWidth * CELL_SIZE / 2;
-
-  const offsetZ =
-    mazeHeight * CELL_SIZE / 2;
-
-
-  for (
-    let row = 0;
-    row &lt; mazeHeight;
-    row++
-  ) {
-
-    for (
-      let col = 0;
-      col &lt; maze[row].length;
-      col++
-    ) {
-
-      const tile =
-        maze[row][col];
-
-
-      const worldX =
-        col * CELL_SIZE
-        - offsetX
-        + CELL_SIZE / 2;
-
-
-      const worldZ =
-        row * CELL_SIZE
-        - offsetZ
-        + CELL_SIZE / 2;
-
-
-      if (tile === &quot;#&quot;) {
-
-        walls.push({
-
-          x: worldX,
-          z: worldZ
-
-        });
-
-      }
-
-
-      if (tile === &quot;P&quot;) {
-
-        player.x = worldX;
-        player.z = worldZ;
-
-      }
-
+        // 敵ごとに発射タイミングを変える
+        shootTimer: random(30, 180)
+      });
     }
-
   }
-
 }
 
-
-// ============================================================
-// DRAW
-// ============================================================
+// ====================
+// メイン
+// ====================
 
 function draw() {
+  background(5, 10, 25);
 
-  background(
-    35,
-    40,
-    50
-  );
-
-
-  // --------------------------
-  // Player
-  // --------------------------
-
-  updatePlayer();
-
-
-  // --------------------------
-  // Camera
-  // --------------------------
-
-  updateCamera();
-
-
-  // --------------------------
-  // Lighting
-  // --------------------------
-
-  ambientLight(
-    150
-  );
-
-
-  directionalLight(
-
-    255,
-    255,
-    255,
-
-    -0.3,
-    -1,
-    -0.5
-
-  );
-
-
-  // --------------------------
-  // World
-  // --------------------------
-
-  drawFloor();
-
-  drawWalls();
-
-}
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-function updatePlayer() {
-
-  let forward = 0;
-  let strafe = 0;
-
-
-  // ------------------------------------------------
-  // Read keyboard EVERY frame
-  // ------------------------------------------------
-
-  if (
-    keyIsDown(87) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    forward += 1;
-  }
-
-  if (
-    keyIsDown(83) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    forward -= 1;
-  }
-
-  if (
-    keyIsDown(65) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    strafe -= 1;
-  }
-
-  if (
-    keyIsDown(68) &amp;&amp;
-    document.activeElement !== document.body
-  ) {
-    strafe += 1;
-  }
-
-
-  // ------------------------------------------------
-  // No movement
-  // ------------------------------------------------
-
-  if (
-    forward === 0 &amp;&amp;
-    strafe === 0
-  ) {
+  if (gameOver) {
+    drawGameOver();
     return;
   }
 
+  movePlayer();
+  drawPlayer();
 
-  // ------------------------------------------------
-  // Forward direction
-  // ------------------------------------------------
+  updatePlayerBullets();
+  updateEnemies();
+  updateEnemyBullets();
 
-  let dx =
-    sin(player.angle) *
-    forward;
+  checkPlayerBulletHits();
+  checkEnemyBulletHits();
 
-
-  let dz =
-    -cos(player.angle) *
-    forward;
-
-
-  // ------------------------------------------------
-  // Strafe
-  // ------------------------------------------------
-
-  dx +=
-    cos(player.angle) *
-    strafe;
-
-
-  dz +=
-    sin(player.angle) *
-    strafe;
-
-
-  // ------------------------------------------------
-  // Normalize
-  // ------------------------------------------------
-
-  const length =
-    sqrt(
-      dx * dx +
-      dz * dz
-    );
-
-
-  if (length === 0) {
-    return;
+  // 敵を全滅
+  if (enemies.length === 0) {
+    wave++;
+    createWave();
+    enemyBullets = [];
   }
 
+  // UI
+  fill(255);
+  textSize(20);
+  text(&quot;SCORE: &quot; + score, 20, 30);
+  text(&quot;WAVE: &quot; + wave, 20, 55);
+}
 
-  dx /= length;
-  dz /= length;
+// ====================
+// プレイヤー移動
+// ====================
 
+function movePlayer() {
 
-  // ------------------------------------------------
-  // Speed
-  // ------------------------------------------------
+  if (keyIsDown(LEFT_ARROW)) {
+    player.x -= player.speed;
+  }
 
-  dx *= MOVE_SPEED;
-  dz *= MOVE_SPEED;
+  if (keyIsDown(RIGHT_ARROW)) {
+    player.x += player.speed;
+  }
 
+  if (keyIsDown(UP_ARROW)) {
+    player.y -= player.speed;
+  }
 
-  // ------------------------------------------------
-  // Collision
-  // ------------------------------------------------
+  if (keyIsDown(DOWN_ARROW)) {
+    player.y += player.speed;
+  }
 
-  moveWithCollision(
-    dx,
-    dz
+  player.x = constrain(player.x, 20, width - 20);
+  player.y = constrain(player.y, 20, height - 20);
+}
+
+// ====================
+// プレイヤー
+// ====================
+
+function drawPlayer() {
+
+  fill(0, 200, 255);
+
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 22,
+    player.y + 20,
+    player.x + 22,
+    player.y + 20
   );
-
 }
 
+// ====================
+// プレイヤーの弾
+// ====================
 
-// ============================================================
-// MOVE WITH COLLISION
-// ============================================================
+function updatePlayerBullets() {
 
-function moveWithCollision(
-  dx,
-  dz
-) {
+  fill(255, 255, 80);
 
-  const nextX =
-    player.x + dx;
+  for (let i = bullets.length - 1; i &gt;= 0; i--) {
 
+    let b = bullets[i];
 
-  if (
-    !isColliding(
-      nextX,
-      player.z
-    )
-  ) {
+    b.x += b.vx;
+    b.y += b.vy;
 
-    player.x = nextX;
-
-  }
-
-
-  const nextZ =
-    player.z + dz;
-
-
-  if (
-    !isColliding(
-      player.x,
-      nextZ
-    )
-  ) {
-
-    player.z = nextZ;
-
-  }
-
-}
-
-
-// ============================================================
-// COLLISION
-// ============================================================
-
-function isColliding(
-  x,
-  z
-) {
-
-  for (
-    const wall of walls
-  ) {
-
-    const closestX =
-      constrain(
-
-        x,
-
-        wall.x - CELL_SIZE / 2,
-        wall.x + CELL_SIZE / 2
-
-      );
-
-
-    const closestZ =
-      constrain(
-
-        z,
-
-        wall.z - CELL_SIZE / 2,
-        wall.z + CELL_SIZE / 2
-
-      );
-
-
-    const distance =
-      dist(
-
-        x,
-        z,
-
-        closestX,
-        closestZ
-
-      );
-
+    ellipse(b.x, b.y, 8, 15);
 
     if (
-      distance &lt; PLAYER_RADIUS
+      b.x &lt; -30 ||
+      b.x &gt; width + 30 ||
+      b.y &lt; -30 ||
+      b.y &gt; height + 30
     ) {
+      bullets.splice(i, 1);
+    }
+  }
+}
 
-      return true;
+// ====================
+// 敵
+// ====================
 
+function updateEnemies() {
+
+  for (let enemy of enemies) {
+
+    enemy.x += enemy.speed;
+
+    if (enemy.x &gt; width - 20 || enemy.x &lt; 20) {
+      enemy.speed *= -1;
+      enemy.y += 15;
     }
 
+    fill(255, 60, 80);
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // ----------------
+    // 敵が弾を撃つ
+    // ----------------
+
+    enemy.shootTimer--;
+
+    if (enemy.shootTimer &lt;= 0) {
+
+      shootEnemyBullets(enemy);
+
+      // ウェーブが進むほど連射
+      enemy.shootTimer =
+        max(40, 150 - wave * 8) + random(20);
+    }
+
+    // 敵がプレイヤーに接触
+    if (
+      dist(
+        player.x,
+        player.y,
+        enemy.x,
+        enemy.y
+      ) &lt; 30
+    ) {
+      gameOver = true;
+    }
+
+    // 敵が下まで来た
+    if (enemy.y &gt; height - 50) {
+      gameOver = true;
+    }
   }
-
-
-  return false;
-
 }
 
+// ====================
+// 敵の弾を発射
+// ====================
 
-// ============================================================
-// CAMERA
-// ============================================================
+function shootEnemyBullets(enemy) {
 
-function updateCamera() {
-
-  const lookDistance = 100;
-
-
-  const lookX =
-    player.x +
-    sin(player.angle) *
-    lookDistance;
-
-
-  const lookZ =
-    player.z -
-    cos(player.angle) *
-    lookDistance;
-
-
-  camera(
-
-    player.x,
-    -PLAYER_HEIGHT,
-    player.z,
-
-    lookX,
-    -PLAYER_HEIGHT,
-    lookZ,
-
+  // 敵から8方向に発射
+  let directions = [
     0,
-    1,
-    0
+    PI / 4,
+    PI / 2,
+    3 * PI / 4,
+    PI,
+    5 * PI / 4,
+    3 * PI / 2,
+    7 * PI / 4
+  ];
 
-  );
+  for (let angle of directions) {
 
+    let speed = 2.5 + wave * 0.15;
+
+    enemyBullets.push({
+      x: enemy.x,
+      y: enemy.y,
+
+      vx: cos(angle) * speed,
+      vy: sin(angle) * speed,
+
+      size: 8
+    });
+  }
 }
 
+// ====================
+// 敵の弾
+// ====================
 
-// ============================================================
-// FLOOR
-// ============================================================
+function updateEnemyBullets() {
 
-function drawFloor() {
-
-  push();
-
-
-  translate(
-    0,
-    20,
-    0
-  );
-
-
-  rotateX(
-    HALF_PI
-  );
-
-
-  // Base color
-
-  ambientMaterial(
-    70,
-    75,
-    80
-  );
-
-
-  plane(
-    3000,
-    3000
-  );
-
-
-  pop();
-
-
-  // Floor grid
-
-  drawFloorGrid();
-
-}
-
-
-// ============================================================
-// FLOOR GRID
-// ============================================================
-
-function drawFloorGrid() {
-
-  push();
-
-
-  translate(
-    0,
-    19,
-    0
-  );
-
-
-  rotateX(
-    HALF_PI
-  );
-
-
-  stroke(
-    110,
-    115,
-    120
-  );
-
-  strokeWeight(1);
-
-
-  const size = 1500;
-
-  const step = CELL_SIZE;
-
+  fill(255, 100, 30);
 
   for (
-    let x = -size;
-    x &lt;= size;
-    x += step
+    let i = enemyBullets.length - 1;
+    i &gt;= 0;
+    i--
   ) {
 
-    line(
-      x,
-      -size,
-      x,
-      size
+    let b = enemyBullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(
+      b.x,
+      b.y,
+      b.size
     );
 
-  }
+    // 画面外
+    if (
+      b.x &lt; -30 ||
+      b.x &gt; width + 30 ||
+      b.y &lt; -30 ||
+      b.y &gt; height + 30
+    ) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
 
+    // プレイヤーに当たった
+    let d = dist(
+      b.x,
+      b.y,
+      player.x,
+      player.y
+    );
+
+    if (d &lt; player.size / 2 + b.size / 2) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーの弾 vs 敵
+// ====================
+
+function checkPlayerBulletHits() {
 
   for (
-    let z = -size;
-    z &lt;= size;
-    z += step
+    let i = enemies.length - 1;
+    i &gt;= 0;
+    i--
   ) {
 
-    line(
-      -size,
-      z,
-      size,
-      z
-    );
+    let enemy = enemies[i];
 
+    for (
+      let j = bullets.length - 1;
+      j &gt;= 0;
+      j--
+    ) {
+
+      let b = bullets[j];
+
+      let d = dist(
+        b.x,
+        b.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (d &lt; enemy.size / 2 + 6) {
+
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+
+        score += 100;
+
+        break;
+      }
+    }
   }
-
-
-  noStroke();
-
-
-  pop();
-
 }
 
+// ====================
+// 敵の弾 vs プレイヤー
+// ====================
 
-// ============================================================
-// WALLS
-// ============================================================
+function checkEnemyBulletHits() {
 
-function drawWalls() {
+  // 念のためここでもチェック
+  for (let b of enemyBullets) {
 
-  for (
-    const wall of walls
-  ) {
-
-    drawWall(
-      wall.x,
-      wall.z
-    );
-
+    if (
+      dist(
+        b.x,
+        b.y,
+        player.x,
+        player.y
+      ) &lt; 18
+    ) {
+      gameOver = true;
+    }
   }
-
 }
 
+// ====================
+// プレイヤーのショット
+// ====================
 
-// ============================================================
-// SINGLE WALL
-// ============================================================
+function keyPressed() {
 
-function drawWall(
-  x,
-  z
-) {
+  if (key === &#039; &#039;) {
 
-  push();
+    // 真上
+    bullets.push({
+      x: player.x,
+      y: player.y - 25,
+      vx: 0,
+      vy: -10
+    });
 
+    // 左上
+    bullets.push({
+      x: player.x - 10,
+      y: player.y - 20,
+      vx: -3,
+      vy: -10
+    });
 
-  translate(
-    x,
-    -30,
-    z
-  );
+    // 右上
+    bullets.push({
+      x: player.x + 10,
+      y: player.y - 20,
+      vx: 3,
+      vy: -10
+    });
+  }
 
-
-  // Base wall
-
-  ambientMaterial(
-    145,
-    155,
-    170
-  );
-
-
-  box(
-    CELL_SIZE,
-    WALL_HEIGHT,
-    CELL_SIZE
-  );
-
-
-  pop();
-
-
-  // Brick pattern
-
-  drawBrickPattern(
-    x,
-    z
-  );
-
+  // リスタート
+  if (key === &#039;r&#039; || key === &#039;R&#039;) {
+    restartGame();
+  }
 }
 
+// ====================
+// ゲームオーバー
+// ====================
 
-// ============================================================
-// BRICK PATTERN
-// ============================================================
+function drawGameOver() {
 
-function drawBrickPattern(
-  x,
-  z
-) {
+  fill(255, 50, 50);
+  textAlign(CENTER);
 
-  const rows = 5;
-
-  const brickHeight =
-    WALL_HEIGHT / rows;
-
-
-  for (
-    let row = 0;
-    row &lt; rows;
-    row++
-  ) {
-
-    const y =
-      -WALL_HEIGHT / 2
-      + brickHeight / 2
-      + row * brickHeight;
-
-
-    const offset =
-      row % 2 === 0
-        ? 0
-        : CELL_SIZE / 2;
-
-
-    // Front
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z - CELL_SIZE / 2 - 0.5,
-      0,
-      offset,
-      brickHeight
-    );
-
-
-    // Back
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z + CELL_SIZE / 2 + 0.5,
-      PI,
-      offset,
-      brickHeight
-    );
-
-  }
-
-}
-
-
-// ============================================================
-// BRICK FACE
-// ============================================================
-
-function drawBrickFace(
-  x,
-  y,
-  z,
-  rotation,
-  offset,
-  brickHeight
-) {
-
-  push();
-
-
-  translate(
-    x,
-    y,
-    z
+  textSize(50);
+  text(
+    &quot;GAME OVER&quot;,
+    width / 2,
+    height / 2
   );
 
+  fill(255);
+  textSize(20);
 
-  rotateY(
-    rotation
+  text(
+    &quot;SCORE: &quot; + score,
+    width / 2,
+    height / 2 + 45
   );
 
-
-  // Horizontal lines
-
-  stroke(
-    80,
-    85,
-    95
+  text(
+    &quot;WAVE: &quot; + wave,
+    width / 2,
+    height / 2 + 75
   );
 
-  strokeWeight(2);
-
-
-  line(
-    -CELL_SIZE / 2,
-    -brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    -brickHeight / 2,
-    0
+  text(
+    &quot;Rキーでリスタート&quot;,
+    width / 2,
+    height / 2 + 110
   );
 
-
-  line(
-    -CELL_SIZE / 2,
-    brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    brickHeight / 2,
-    0
-  );
-
-
-  // Vertical brick lines
-
-  const brickWidth = 40;
-
-
-  for (
-    let i = -2;
-    i &lt;= 2;
-    i++
-  ) {
-
-    const bx =
-      i * brickWidth
-      + offset % brickWidth;
-
-
-    line(
-      bx,
-      -brickHeight / 2,
-      0,
-
-      bx,
-      brickHeight / 2,
-      0
-    );
-
-  }
-
-
-  noStroke();
-
-
-  pop();
-
+  textAlign(LEFT);
 }
 
+// ====================
+// リスタート
+// ====================
 
-// ============================================================
-// MOUSE
-// ============================================================
+function restartGame() {
 
-function mousePressed() {
+  bullets = [];
+  enemyBullets = [];
 
-  if (
-    document.pointerLockElement
-  ) {
+  score = 0;
+  wave = 1;
+  gameOver = false;
 
-    return;
+  player.x = width / 2;
+  player.y = height - 60;
 
-  }
-
-
-  requestPointerLock();
-
-}
-
-
-// ============================================================
-// MOUSE LOOK
-// ============================================================
-
-function mouseMoved() {
-
-  if (
-    document.pointerLockElement
-  ) {
-
-    player.angle +=
-      movedX *
-      MOUSE_SENSITIVITY;
-
-  }
-
-}
-
-
-// ============================================================
-// KEY RESET
-// ============================================================
-
-function keyReleased() {
-
-  // Force browser to release
-  // any possible stuck key.
-
-  if (
-    key === &quot;w&quot; ||
-    key === &quot;W&quot;
-  ) {
-    return;
-  }
-
-  if (
-    key === &quot;a&quot; ||
-    key === &quot;A&quot;
-  ) {
-    return;
-  }
-
-  if (
-    key === &quot;s&quot; ||
-    key === &quot;S&quot;
-  ) {
-    return;
-  }
-
-  if (
-    key === &quot;d&quot; ||
-    key === &quot;D&quot;
-  ) {
-    return;
-  }
-
-}
-
-
-// ============================================================
-// WINDOW BLUR
-// ============================================================
-
-window.addEventListener(
-  &quot;blur&quot;,
-  function() {
-
-    // Nothing is stored as movement state.
-    // keyIsDown() will naturally stop
-    // once the browser releases the key.
-
-  }
-);
-
-
-// ============================================================
-// RESIZE
-// ============================================================
-
-function windowResized() {
-
-  resizeCanvas(
-    windowWidth,
-    windowHeight
-  );
-
-}
-</code></pre>
+  createWave();
+}</code></pre>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
@@ -1100,7 +625,6 @@ function windowResized() {
       });
     }
 
-    // DOM変更を常時監視して、キャンバスがbody直下に作られた瞬間に即移動
     const observer = new MutationObserver(relocateCanvas);
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener("DOMContentLoaded", relocateCanvas);
@@ -1109,7 +633,6 @@ function windowResized() {
 
   <!-- 4. 生徒のスクリプト実行 -->
   <script>
-    // 生徒が定義する setup の完了時にも即座にキャンバス格納を実行するフック
     window.addEventListener('load', () => {
       if (typeof window.setup === 'function') {
         const originalSetup = window.setup;
@@ -1120,943 +643,468 @@ function windowResized() {
       }
     });
   </script>
-  <script>// ============================================================
-// 3D FPS MAZE
-// p5.js
-// ============================================================
+  <script>let player;
+let bullets = [];
+let enemyBullets = [];
+let enemies = [];
 
+let score = 0;
+let wave = 1;
+let gameOver = false;
 
-// ============================================================
-// MAZE
-// ============================================================
+let shootTimer = 0;
 
-const maze = [
-  "###############",
-  "#P            #",
-  "# ##### ##### #",
-  "#     #       #",
-  "##### # #######",
-  "#     #       #",
-  "# ### ##### # #",
-  "# #         # #",
-  "# # ####### # #",
-  "# #       #   #",
-  "# ####### #####",
-  "#             #",
-  "###############"
-];
-
-
-// ============================================================
-// SETTINGS
-// ============================================================
-
-const CELL_SIZE = 80;
-const WALL_HEIGHT = 120;
-
-const PLAYER_HEIGHT = 45;
-const PLAYER_RADIUS = 18;
-
-const MOVE_SPEED = 3.5;
-
-const MOUSE_SENSITIVITY = 0.0025;
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-let player = {
-  x: 0,
-  z: 0,
-  angle: 0
-};
-
-
-// ============================================================
-// WALLS
-// ============================================================
-
-let walls = [];
-
-
-// ============================================================
-// SETUP
-// ============================================================
+// ====================
+// セットアップ
+// ====================
 
 function setup() {
+  createCanvas(600, 600);
 
-  createCanvas(
-    windowWidth,
-    windowHeight,
-    WEBGL
-  );
+  player = {
+    x: width / 2,
+    y: height - 60,
+    speed: 6,
+    size: 30
+  };
 
-  createMaze();
-
-  noStroke();
-
+  createWave();
 }
 
+// ====================
+// 敵ウェーブ
+// ====================
 
-// ============================================================
-// CREATE MAZE
-// ============================================================
+function createWave() {
+  enemies = [];
 
-function createMaze() {
+  let rows = min(2 + wave, 7);
+  let cols = 8 + min(wave, 4);
 
-  const mazeWidth =
-    maze[0].length;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      enemies.push({
+        x: 50 + col * (500 / (cols - 1)),
+        y: 60 + row * 45,
 
-  const mazeHeight =
-    maze.length;
+        speed: 1.5 + wave * 0.2,
+        size: 32,
 
-
-  const offsetX =
-    mazeWidth * CELL_SIZE / 2;
-
-  const offsetZ =
-    mazeHeight * CELL_SIZE / 2;
-
-
-  for (
-    let row = 0;
-    row < mazeHeight;
-    row++
-  ) {
-
-    for (
-      let col = 0;
-      col < maze[row].length;
-      col++
-    ) {
-
-      const tile =
-        maze[row][col];
-
-
-      const worldX =
-        col * CELL_SIZE
-        - offsetX
-        + CELL_SIZE / 2;
-
-
-      const worldZ =
-        row * CELL_SIZE
-        - offsetZ
-        + CELL_SIZE / 2;
-
-
-      if (tile === "#") {
-
-        walls.push({
-
-          x: worldX,
-          z: worldZ
-
-        });
-
-      }
-
-
-      if (tile === "P") {
-
-        player.x = worldX;
-        player.z = worldZ;
-
-      }
-
+        // 敵ごとに発射タイミングを変える
+        shootTimer: random(30, 180)
+      });
     }
-
   }
-
 }
 
-
-// ============================================================
-// DRAW
-// ============================================================
+// ====================
+// メイン
+// ====================
 
 function draw() {
+  background(5, 10, 25);
 
-  background(
-    35,
-    40,
-    50
-  );
-
-
-  // --------------------------
-  // Player
-  // --------------------------
-
-  updatePlayer();
-
-
-  // --------------------------
-  // Camera
-  // --------------------------
-
-  updateCamera();
-
-
-  // --------------------------
-  // Lighting
-  // --------------------------
-
-  ambientLight(
-    150
-  );
-
-
-  directionalLight(
-
-    255,
-    255,
-    255,
-
-    -0.3,
-    -1,
-    -0.5
-
-  );
-
-
-  // --------------------------
-  // World
-  // --------------------------
-
-  drawFloor();
-
-  drawWalls();
-
-}
-
-
-// ============================================================
-// PLAYER
-// ============================================================
-
-function updatePlayer() {
-
-  let forward = 0;
-  let strafe = 0;
-
-
-  // ------------------------------------------------
-  // Read keyboard EVERY frame
-  // ------------------------------------------------
-
-  if (
-    keyIsDown(87) &&
-    document.activeElement !== document.body
-  ) {
-    forward += 1;
-  }
-
-  if (
-    keyIsDown(83) &&
-    document.activeElement !== document.body
-  ) {
-    forward -= 1;
-  }
-
-  if (
-    keyIsDown(65) &&
-    document.activeElement !== document.body
-  ) {
-    strafe -= 1;
-  }
-
-  if (
-    keyIsDown(68) &&
-    document.activeElement !== document.body
-  ) {
-    strafe += 1;
-  }
-
-
-  // ------------------------------------------------
-  // No movement
-  // ------------------------------------------------
-
-  if (
-    forward === 0 &&
-    strafe === 0
-  ) {
+  if (gameOver) {
+    drawGameOver();
     return;
   }
 
+  movePlayer();
+  drawPlayer();
 
-  // ------------------------------------------------
-  // Forward direction
-  // ------------------------------------------------
+  updatePlayerBullets();
+  updateEnemies();
+  updateEnemyBullets();
 
-  let dx =
-    sin(player.angle) *
-    forward;
+  checkPlayerBulletHits();
+  checkEnemyBulletHits();
 
-
-  let dz =
-    -cos(player.angle) *
-    forward;
-
-
-  // ------------------------------------------------
-  // Strafe
-  // ------------------------------------------------
-
-  dx +=
-    cos(player.angle) *
-    strafe;
-
-
-  dz +=
-    sin(player.angle) *
-    strafe;
-
-
-  // ------------------------------------------------
-  // Normalize
-  // ------------------------------------------------
-
-  const length =
-    sqrt(
-      dx * dx +
-      dz * dz
-    );
-
-
-  if (length === 0) {
-    return;
+  // 敵を全滅
+  if (enemies.length === 0) {
+    wave++;
+    createWave();
+    enemyBullets = [];
   }
 
+  // UI
+  fill(255);
+  textSize(20);
+  text("SCORE: " + score, 20, 30);
+  text("WAVE: " + wave, 20, 55);
+}
 
-  dx /= length;
-  dz /= length;
+// ====================
+// プレイヤー移動
+// ====================
 
+function movePlayer() {
 
-  // ------------------------------------------------
-  // Speed
-  // ------------------------------------------------
+  if (keyIsDown(LEFT_ARROW)) {
+    player.x -= player.speed;
+  }
 
-  dx *= MOVE_SPEED;
-  dz *= MOVE_SPEED;
+  if (keyIsDown(RIGHT_ARROW)) {
+    player.x += player.speed;
+  }
 
+  if (keyIsDown(UP_ARROW)) {
+    player.y -= player.speed;
+  }
 
-  // ------------------------------------------------
-  // Collision
-  // ------------------------------------------------
+  if (keyIsDown(DOWN_ARROW)) {
+    player.y += player.speed;
+  }
 
-  moveWithCollision(
-    dx,
-    dz
+  player.x = constrain(player.x, 20, width - 20);
+  player.y = constrain(player.y, 20, height - 20);
+}
+
+// ====================
+// プレイヤー
+// ====================
+
+function drawPlayer() {
+
+  fill(0, 200, 255);
+
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 22,
+    player.y + 20,
+    player.x + 22,
+    player.y + 20
   );
-
 }
 
+// ====================
+// プレイヤーの弾
+// ====================
 
-// ============================================================
-// MOVE WITH COLLISION
-// ============================================================
+function updatePlayerBullets() {
 
-function moveWithCollision(
-  dx,
-  dz
-) {
+  fill(255, 255, 80);
 
-  const nextX =
-    player.x + dx;
+  for (let i = bullets.length - 1; i >= 0; i--) {
 
+    let b = bullets[i];
 
-  if (
-    !isColliding(
-      nextX,
-      player.z
-    )
-  ) {
+    b.x += b.vx;
+    b.y += b.vy;
 
-    player.x = nextX;
-
-  }
-
-
-  const nextZ =
-    player.z + dz;
-
-
-  if (
-    !isColliding(
-      player.x,
-      nextZ
-    )
-  ) {
-
-    player.z = nextZ;
-
-  }
-
-}
-
-
-// ============================================================
-// COLLISION
-// ============================================================
-
-function isColliding(
-  x,
-  z
-) {
-
-  for (
-    const wall of walls
-  ) {
-
-    const closestX =
-      constrain(
-
-        x,
-
-        wall.x - CELL_SIZE / 2,
-        wall.x + CELL_SIZE / 2
-
-      );
-
-
-    const closestZ =
-      constrain(
-
-        z,
-
-        wall.z - CELL_SIZE / 2,
-        wall.z + CELL_SIZE / 2
-
-      );
-
-
-    const distance =
-      dist(
-
-        x,
-        z,
-
-        closestX,
-        closestZ
-
-      );
-
+    ellipse(b.x, b.y, 8, 15);
 
     if (
-      distance < PLAYER_RADIUS
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
     ) {
+      bullets.splice(i, 1);
+    }
+  }
+}
 
-      return true;
+// ====================
+// 敵
+// ====================
 
+function updateEnemies() {
+
+  for (let enemy of enemies) {
+
+    enemy.x += enemy.speed;
+
+    if (enemy.x > width - 20 || enemy.x < 20) {
+      enemy.speed *= -1;
+      enemy.y += 15;
     }
 
+    fill(255, 60, 80);
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // ----------------
+    // 敵が弾を撃つ
+    // ----------------
+
+    enemy.shootTimer--;
+
+    if (enemy.shootTimer <= 0) {
+
+      shootEnemyBullets(enemy);
+
+      // ウェーブが進むほど連射
+      enemy.shootTimer =
+        max(40, 150 - wave * 8) + random(20);
+    }
+
+    // 敵がプレイヤーに接触
+    if (
+      dist(
+        player.x,
+        player.y,
+        enemy.x,
+        enemy.y
+      ) < 30
+    ) {
+      gameOver = true;
+    }
+
+    // 敵が下まで来た
+    if (enemy.y > height - 50) {
+      gameOver = true;
+    }
   }
-
-
-  return false;
-
 }
 
+// ====================
+// 敵の弾を発射
+// ====================
 
-// ============================================================
-// CAMERA
-// ============================================================
+function shootEnemyBullets(enemy) {
 
-function updateCamera() {
-
-  const lookDistance = 100;
-
-
-  const lookX =
-    player.x +
-    sin(player.angle) *
-    lookDistance;
-
-
-  const lookZ =
-    player.z -
-    cos(player.angle) *
-    lookDistance;
-
-
-  camera(
-
-    player.x,
-    -PLAYER_HEIGHT,
-    player.z,
-
-    lookX,
-    -PLAYER_HEIGHT,
-    lookZ,
-
+  // 敵から8方向に発射
+  let directions = [
     0,
-    1,
-    0
+    PI / 4,
+    PI / 2,
+    3 * PI / 4,
+    PI,
+    5 * PI / 4,
+    3 * PI / 2,
+    7 * PI / 4
+  ];
 
-  );
+  for (let angle of directions) {
 
+    let speed = 2.5 + wave * 0.15;
+
+    enemyBullets.push({
+      x: enemy.x,
+      y: enemy.y,
+
+      vx: cos(angle) * speed,
+      vy: sin(angle) * speed,
+
+      size: 8
+    });
+  }
 }
 
+// ====================
+// 敵の弾
+// ====================
 
-// ============================================================
-// FLOOR
-// ============================================================
+function updateEnemyBullets() {
 
-function drawFloor() {
-
-  push();
-
-
-  translate(
-    0,
-    20,
-    0
-  );
-
-
-  rotateX(
-    HALF_PI
-  );
-
-
-  // Base color
-
-  ambientMaterial(
-    70,
-    75,
-    80
-  );
-
-
-  plane(
-    3000,
-    3000
-  );
-
-
-  pop();
-
-
-  // Floor grid
-
-  drawFloorGrid();
-
-}
-
-
-// ============================================================
-// FLOOR GRID
-// ============================================================
-
-function drawFloorGrid() {
-
-  push();
-
-
-  translate(
-    0,
-    19,
-    0
-  );
-
-
-  rotateX(
-    HALF_PI
-  );
-
-
-  stroke(
-    110,
-    115,
-    120
-  );
-
-  strokeWeight(1);
-
-
-  const size = 1500;
-
-  const step = CELL_SIZE;
-
+  fill(255, 100, 30);
 
   for (
-    let x = -size;
-    x <= size;
-    x += step
+    let i = enemyBullets.length - 1;
+    i >= 0;
+    i--
   ) {
 
-    line(
-      x,
-      -size,
-      x,
-      size
+    let b = enemyBullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(
+      b.x,
+      b.y,
+      b.size
     );
 
-  }
+    // 画面外
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
 
+    // プレイヤーに当たった
+    let d = dist(
+      b.x,
+      b.y,
+      player.x,
+      player.y
+    );
+
+    if (d < player.size / 2 + b.size / 2) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーの弾 vs 敵
+// ====================
+
+function checkPlayerBulletHits() {
 
   for (
-    let z = -size;
-    z <= size;
-    z += step
+    let i = enemies.length - 1;
+    i >= 0;
+    i--
   ) {
 
-    line(
-      -size,
-      z,
-      size,
-      z
-    );
+    let enemy = enemies[i];
 
+    for (
+      let j = bullets.length - 1;
+      j >= 0;
+      j--
+    ) {
+
+      let b = bullets[j];
+
+      let d = dist(
+        b.x,
+        b.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (d < enemy.size / 2 + 6) {
+
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+
+        score += 100;
+
+        break;
+      }
+    }
   }
-
-
-  noStroke();
-
-
-  pop();
-
 }
 
+// ====================
+// 敵の弾 vs プレイヤー
+// ====================
 
-// ============================================================
-// WALLS
-// ============================================================
+function checkEnemyBulletHits() {
 
-function drawWalls() {
+  // 念のためここでもチェック
+  for (let b of enemyBullets) {
 
-  for (
-    const wall of walls
-  ) {
-
-    drawWall(
-      wall.x,
-      wall.z
-    );
-
+    if (
+      dist(
+        b.x,
+        b.y,
+        player.x,
+        player.y
+      ) < 18
+    ) {
+      gameOver = true;
+    }
   }
-
 }
 
+// ====================
+// プレイヤーのショット
+// ====================
 
-// ============================================================
-// SINGLE WALL
-// ============================================================
+function keyPressed() {
 
-function drawWall(
-  x,
-  z
-) {
+  if (key === ' ') {
 
-  push();
+    // 真上
+    bullets.push({
+      x: player.x,
+      y: player.y - 25,
+      vx: 0,
+      vy: -10
+    });
 
+    // 左上
+    bullets.push({
+      x: player.x - 10,
+      y: player.y - 20,
+      vx: -3,
+      vy: -10
+    });
 
-  translate(
-    x,
-    -30,
-    z
-  );
+    // 右上
+    bullets.push({
+      x: player.x + 10,
+      y: player.y - 20,
+      vx: 3,
+      vy: -10
+    });
+  }
 
-
-  // Base wall
-
-  ambientMaterial(
-    145,
-    155,
-    170
-  );
-
-
-  box(
-    CELL_SIZE,
-    WALL_HEIGHT,
-    CELL_SIZE
-  );
-
-
-  pop();
-
-
-  // Brick pattern
-
-  drawBrickPattern(
-    x,
-    z
-  );
-
+  // リスタート
+  if (key === 'r' || key === 'R') {
+    restartGame();
+  }
 }
 
+// ====================
+// ゲームオーバー
+// ====================
 
-// ============================================================
-// BRICK PATTERN
-// ============================================================
+function drawGameOver() {
 
-function drawBrickPattern(
-  x,
-  z
-) {
+  fill(255, 50, 50);
+  textAlign(CENTER);
 
-  const rows = 5;
-
-  const brickHeight =
-    WALL_HEIGHT / rows;
-
-
-  for (
-    let row = 0;
-    row < rows;
-    row++
-  ) {
-
-    const y =
-      -WALL_HEIGHT / 2
-      + brickHeight / 2
-      + row * brickHeight;
-
-
-    const offset =
-      row % 2 === 0
-        ? 0
-        : CELL_SIZE / 2;
-
-
-    // Front
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z - CELL_SIZE / 2 - 0.5,
-      0,
-      offset,
-      brickHeight
-    );
-
-
-    // Back
-
-    drawBrickFace(
-      x,
-      y - 30,
-      z + CELL_SIZE / 2 + 0.5,
-      PI,
-      offset,
-      brickHeight
-    );
-
-  }
-
-}
-
-
-// ============================================================
-// BRICK FACE
-// ============================================================
-
-function drawBrickFace(
-  x,
-  y,
-  z,
-  rotation,
-  offset,
-  brickHeight
-) {
-
-  push();
-
-
-  translate(
-    x,
-    y,
-    z
+  textSize(50);
+  text(
+    "GAME OVER",
+    width / 2,
+    height / 2
   );
 
+  fill(255);
+  textSize(20);
 
-  rotateY(
-    rotation
+  text(
+    "SCORE: " + score,
+    width / 2,
+    height / 2 + 45
   );
 
-
-  // Horizontal lines
-
-  stroke(
-    80,
-    85,
-    95
+  text(
+    "WAVE: " + wave,
+    width / 2,
+    height / 2 + 75
   );
 
-  strokeWeight(2);
-
-
-  line(
-    -CELL_SIZE / 2,
-    -brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    -brickHeight / 2,
-    0
+  text(
+    "Rキーでリスタート",
+    width / 2,
+    height / 2 + 110
   );
 
-
-  line(
-    -CELL_SIZE / 2,
-    brickHeight / 2,
-    0,
-
-    CELL_SIZE / 2,
-    brickHeight / 2,
-    0
-  );
-
-
-  // Vertical brick lines
-
-  const brickWidth = 40;
-
-
-  for (
-    let i = -2;
-    i <= 2;
-    i++
-  ) {
-
-    const bx =
-      i * brickWidth
-      + offset % brickWidth;
-
-
-    line(
-      bx,
-      -brickHeight / 2,
-      0,
-
-      bx,
-      brickHeight / 2,
-      0
-    );
-
-  }
-
-
-  noStroke();
-
-
-  pop();
-
+  textAlign(LEFT);
 }
 
+// ====================
+// リスタート
+// ====================
 
-// ============================================================
-// MOUSE
-// ============================================================
+function restartGame() {
 
-function mousePressed() {
+  bullets = [];
+  enemyBullets = [];
 
-  if (
-    document.pointerLockElement
-  ) {
+  score = 0;
+  wave = 1;
+  gameOver = false;
 
-    return;
+  player.x = width / 2;
+  player.y = height - 60;
 
-  }
-
-
-  requestPointerLock();
-
-}
-
-
-// ============================================================
-// MOUSE LOOK
-// ============================================================
-
-function mouseMoved() {
-
-  if (
-    document.pointerLockElement
-  ) {
-
-    player.angle +=
-      movedX *
-      MOUSE_SENSITIVITY;
-
-  }
-
-}
-
-
-// ============================================================
-// KEY RESET
-// ============================================================
-
-function keyReleased() {
-
-  // Force browser to release
-  // any possible stuck key.
-
-  if (
-    key === "w" ||
-    key === "W"
-  ) {
-    return;
-  }
-
-  if (
-    key === "a" ||
-    key === "A"
-  ) {
-    return;
-  }
-
-  if (
-    key === "s" ||
-    key === "S"
-  ) {
-    return;
-  }
-
-  if (
-    key === "d" ||
-    key === "D"
-  ) {
-    return;
-  }
-
-}
-
-
-// ============================================================
-// WINDOW BLUR
-// ============================================================
-
-window.addEventListener(
-  "blur",
-  function() {
-
-    // Nothing is stored as movement state.
-    // keyIsDown() will naturally stop
-    // once the browser releases the key.
-
-  }
-);
-
-
-// ============================================================
-// RESIZE
-// ============================================================
-
-function windowResized() {
-
-  resizeCanvas(
-    windowWidth,
-    windowHeight
-  );
-
-}
-</script>
+  createWave();
+}</script>
 </body>
 </html>
