@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>長澤冠太さんのゲーム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <style>
+    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
+    h1 { font-size: 1.2rem; margin-bottom: 5px; }
+    p { color: #aaa; margin-bottom: 20px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← 回覧板に戻る</a>
+  <h1>長澤冠太 (1年 番号:5)</h1>
+  <p>よけてください（WAVEを31までがんばってください）</p>
+  <script>let player;
+let bullets = [];
+let enemyBullets = [];
+let enemies = [];
+
+let score = 0;
+let wave = 1;
+let gameOver = false;
+
+let shootTimer = 0;
+
+// ====================
+// セットアップ
+// ====================
+
+function setup() {
+  createCanvas(600, 600);
+
+  player = {
+    x: width / 2,
+    y: height - 60,
+    speed: 6,
+    size: 30
+  };
+
+  createWave();
+}
+
+// ====================
+// 敵ウェーブ
+// ====================
+
+function createWave() {
+  enemies = [];
+
+  let rows = min(2 + wave, 7);
+  let cols = 8 + min(wave, 4);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      enemies.push({
+        x: 50 + col * (500 / (cols - 1)),
+        y: 60 + row * 45,
+
+        speed: 1.5 + wave * 0.2,
+        size: 32,
+
+        // 敵ごとに発射タイミングを変える
+        shootTimer: random(30, 180)
+      });
+    }
+  }
+}
+
+// ====================
+// メイン
+// ====================
+
+function draw() {
+  background(5, 10, 25);
+
+  if (gameOver) {
+    drawGameOver();
+    return;
+  }
+
+  movePlayer();
+  drawPlayer();
+
+  updatePlayerBullets();
+  updateEnemies();
+  updateEnemyBullets();
+
+  checkPlayerBulletHits();
+  checkEnemyBulletHits();
+
+  // 敵を全滅
+  if (enemies.length === 0) {
+    wave++;
+    createWave();
+    enemyBullets = [];
+  }
+
+  // UI
+  fill(255);
+  textSize(20);
+  text("SCORE: " + score, 20, 30);
+  text("WAVE: " + wave, 20, 55);
+}
+
+// ====================
+// プレイヤー移動
+// ====================
+
+function movePlayer() {
+
+  if (keyIsDown(LEFT_ARROW)) {
+    player.x -= player.speed;
+  }
+
+  if (keyIsDown(RIGHT_ARROW)) {
+    player.x += player.speed;
+  }
+
+  if (keyIsDown(UP_ARROW)) {
+    player.y -= player.speed;
+  }
+
+  if (keyIsDown(DOWN_ARROW)) {
+    player.y += player.speed;
+  }
+
+  player.x = constrain(player.x, 20, width - 20);
+  player.y = constrain(player.y, 20, height - 20);
+}
+
+// ====================
+// プレイヤー
+// ====================
+
+function drawPlayer() {
+
+  fill(0, 200, 255);
+
+  triangle(
+    player.x,
+    player.y - 25,
+    player.x - 22,
+    player.y + 20,
+    player.x + 22,
+    player.y + 20
+  );
+}
+
+// ====================
+// プレイヤーの弾
+// ====================
+
+function updatePlayerBullets() {
+
+  fill(255, 255, 80);
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+
+    let b = bullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(b.x, b.y, 8, 15);
+
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      bullets.splice(i, 1);
+    }
+  }
+}
+
+// ====================
+// 敵
+// ====================
+
+function updateEnemies() {
+
+  for (let enemy of enemies) {
+
+    enemy.x += enemy.speed;
+
+    if (enemy.x > width - 20 || enemy.x < 20) {
+      enemy.speed *= -1;
+      enemy.y += 15;
+    }
+
+    fill(255, 60, 80);
+    ellipse(
+      enemy.x,
+      enemy.y,
+      enemy.size
+    );
+
+    // ----------------
+    // 敵が弾を撃つ
+    // ----------------
+
+    enemy.shootTimer--;
+
+    if (enemy.shootTimer <= 0) {
+
+      shootEnemyBullets(enemy);
+
+      // ウェーブが進むほど連射
+      enemy.shootTimer =
+        max(40, 150 - wave * 8) + random(20);
+    }
+
+    // 敵がプレイヤーに接触
+    if (
+      dist(
+        player.x,
+        player.y,
+        enemy.x,
+        enemy.y
+      ) < 30
+    ) {
+      gameOver = true;
+    }
+
+    // 敵が下まで来た
+    if (enemy.y > height - 50) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// 敵の弾を発射
+// ====================
+
+function shootEnemyBullets(enemy) {
+
+  // 敵から8方向に発射
+  let directions = [
+    0,
+    PI / 4,
+    PI / 2,
+    3 * PI / 4,
+    PI,
+    5 * PI / 4,
+    3 * PI / 2,
+    7 * PI / 4
+  ];
+
+  for (let angle of directions) {
+
+    let speed = 2.5 + wave * 0.15;
+
+    enemyBullets.push({
+      x: enemy.x,
+      y: enemy.y,
+
+      vx: cos(angle) * speed,
+      vy: sin(angle) * speed,
+
+      size: 8
+    });
+  }
+}
+
+// ====================
+// 敵の弾
+// ====================
+
+function updateEnemyBullets() {
+
+  fill(255, 100, 30);
+
+  for (
+    let i = enemyBullets.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let b = enemyBullets[i];
+
+    b.x += b.vx;
+    b.y += b.vy;
+
+    ellipse(
+      b.x,
+      b.y,
+      b.size
+    );
+
+    // 画面外
+    if (
+      b.x < -30 ||
+      b.x > width + 30 ||
+      b.y < -30 ||
+      b.y > height + 30
+    ) {
+      enemyBullets.splice(i, 1);
+      continue;
+    }
+
+    // プレイヤーに当たった
+    let d = dist(
+      b.x,
+      b.y,
+      player.x,
+      player.y
+    );
+
+    if (d < player.size / 2 + b.size / 2) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーの弾 vs 敵
+// ====================
+
+function checkPlayerBulletHits() {
+
+  for (
+    let i = enemies.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let enemy = enemies[i];
+
+    for (
+      let j = bullets.length - 1;
+      j >= 0;
+      j--
+    ) {
+
+      let b = bullets[j];
+
+      let d = dist(
+        b.x,
+        b.y,
+        enemy.x,
+        enemy.y
+      );
+
+      if (d < enemy.size / 2 + 6) {
+
+        enemies.splice(i, 1);
+        bullets.splice(j, 1);
+
+        score += 100;
+
+        break;
+      }
+    }
+  }
+}
+
+// ====================
+// 敵の弾 vs プレイヤー
+// ====================
+
+function checkEnemyBulletHits() {
+
+  // 念のためここでもチェック
+  for (let b of enemyBullets) {
+
+    if (
+      dist(
+        b.x,
+        b.y,
+        player.x,
+        player.y
+      ) < 18
+    ) {
+      gameOver = true;
+    }
+  }
+}
+
+// ====================
+// プレイヤーのショット
+// ====================
+
+function keyPressed() {
+
+  if (key === ' ') {
+
+    // 真上
+    bullets.push({
+      x: player.x,
+      y: player.y - 25,
+      vx: 0,
+      vy: -10
+    });
+
+    // 左上
+    bullets.push({
+      x: player.x - 10,
+      y: player.y - 20,
+      vx: -3,
+      vy: -10
+    });
+
+    // 右上
+    bullets.push({
+      x: player.x + 10,
+      y: player.y - 20,
+      vx: 3,
+      vy: -10
+    });
+  }
+
+  // リスタート
+  if (key === 'r' || key === 'R') {
+    restartGame();
+  }
+}
+
+// ====================
+// ゲームオーバー
+// ====================
+
+function drawGameOver() {
+
+  fill(255, 50, 50);
+  textAlign(CENTER);
+
+  textSize(50);
+  text(
+    "GAME OVER",
+    width / 2,
+    height / 2
+  );
+
+  fill(255);
+  textSize(20);
+
+  text(
+    "SCORE: " + score,
+    width / 2,
+    height / 2 + 45
+  );
+
+  text(
+    "WAVE: " + wave,
+    width / 2,
+    height / 2 + 75
+  );
+
+  text(
+    "Rキーでリスタート",
+    width / 2,
+    height / 2 + 110
+  );
+
+  textAlign(LEFT);
+}
+
+// ====================
+// リスタート
+// ====================
+
+function restartGame() {
+
+  bullets = [];
+  enemyBullets = [];
+
+  score = 0;
+  wave = 1;
+  gameOver = false;
+
+  player.x = width / 2;
+  player.y = height - 60;
+
+  createWave();
+}</script>
+</body>
+</html>
