@@ -6,15 +6,92 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
-    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
-    h1 { font-size: 1.2rem; margin-bottom: 5px; }
-    p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
-    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
-    .back-link:hover { text-decoration: underline; }
-    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
-    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+    p {
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    #game-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    #game-container canvas {
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 4px;
+    }
+    .code-container {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      text-align: left;
+      background: #272822;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #1e1e1e;
+      margin: 0;
+      padding: 8px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-header span {
+      font-size: 0.85rem;
+      color: #888;
+      font-weight: bold;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .copy-btn:hover {
+      background: #333;
+      border-color: #666;
+      color: #fff;
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    pre {
+      margin: 0 !important;
+      padding: 15px !important;
+      font-size: 0.85rem;
+      max-height: 500px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -22,2926 +99,20 @@
   <h1>作者: 相良</h1>
   <p>ハンターのマジック　タワーディフェンス</p>
   
-  <script>// =====================================================
-// CASTLE MAGIC
-// p5.js Mobile Vertical Game
-// =====================================================
+  <!-- ゲーム画面を配置する領域 -->
+  <div id="game-container"></div>
 
-let castle;
-
-let enemies = [];
-let missiles = [];
-let particles = [];
-let effects = [];
-
-let level = 1;
-let xp = 0;
-let xpNeed = 6;
-
-let gameState = "play";
-
-let spawnTimer = 0;
-let spellTimer = 0;
-let specialTimer = 0;
-
-let upgrades = [];
-
-
-// =====================================================
-// PLAYER / MAGIC
-// =====================================================
-
-let magic = {
-  damage: 45,
-
-  cooldown: 2000,
-
-  missileSpeed: 7,
-
-  missileCount: 1,
-
-  pierce: 0,
-
-  explosion: 0,
-
-  lightning: 0,
-
-  ice: 0,
-
-  meteor: 0,
-
-  tornado: 0,
-
-  holy: 0,
-
-  heal: 0
-};
-
-
-// =====================================================
-// SETUP
-// =====================================================
-
-function setup() {
-
-  createCanvas(
-    min(windowWidth, 480),
-    windowHeight
-  );
-
-  castle = {
-    x: width / 2,
-
-    y: height - 75,
-
-    width: 135,
-
-    height: 65,
-
-    hp: 2000,
-
-    maxHp: 2000
-  };
-
-  spellTimer = millis();
-
-  specialTimer = millis();
-
-  textFont("sans-serif");
-}
-
-
-// =====================================================
-// DRAW
-// =====================================================
-
-function draw() {
-
-  drawBackground();
-
-  if (gameState === "play") {
-
-    updateGame();
-
-    drawGame();
-
-  } else if (gameState === "levelup") {
-
-    drawGame();
-
-    drawLevelUp();
-
-  } else if (gameState === "gameover") {
-
-    drawGame();
-
-    drawGameOver();
-  }
-}
-
-
-// =====================================================
-// GAME UPDATE
-// =====================================================
-
-function updateGame() {
-
-  spawnEnemies();
-
-  updateEnemies();
-
-  autoSpell();
-
-  updateMissiles();
-
-  updateSpecialMagic();
-
-  updateEffects();
-
-  updateParticles();
-
-  if (magic.heal > 0) {
-
-    castle.hp = min(
-      castle.maxHp,
-      castle.hp +
-      magic.heal *
-      0.015 *
-      deltaTime
-    );
-  }
-
-  if (castle.hp <= 0) {
-
-    castle.hp = 0;
-
-    gameState = "gameover";
-  }
-}
-
-
-// =====================================================
-// BACKGROUND
-// =====================================================
-
-function drawBackground() {
-
-  background(
-    7,
-    12,
-    30
-  );
-
-
-  // sky gradient
-
-  for (
-    let y = 0;
-    y < height;
-    y += 4
-  ) {
-
-    let t = y / height;
-
-    let r = lerp(
-      8,
-      18,
-      t
-    );
-
-    let g = lerp(
-      15,
-      25,
-      t
-    );
-
-    let b = lerp(
-      42,
-      55,
-      t
-    );
-
-    stroke(
-      r,
-      g,
-      b
-    );
-
-    line(
-      0,
-      y,
-      width,
-      y
-    );
-  }
-
-  noStroke();
-
-
-  // moon
-
-  fill(
-    170,
-    200,
-    255,
-    35
-  );
-
-  ellipse(
-    width * 0.82,
-    95,
-    90
-  );
-
-  fill(
-    210,
-    225,
-    255,
-    100
-  );
-
-  ellipse(
-    width * 0.82,
-    95,
-    45
-  );
-
-
-  // stars
-
-  for (
-    let i = 0;
-    i < 35;
-    i++
-  ) {
-
-    let x =
-      (i * 97) % width;
-
-    let y =
-      (i * 137) %
-      (height * 0.65);
-
-    fill(
-      150,
-      200,
-      255,
-      80
-    );
-
-    ellipse(
-      x,
-      y,
-      2,
-      2
-    );
-  }
-
-
-  // distant mountains
-
-  fill(
-    12,
-    22,
-    45
-  );
-
-  beginShape();
-
-  vertex(
-    0,
-    height * 0.52
-  );
-
-  for (
-    let x = 0;
-    x <= width;
-    x += 30
-  ) {
-
-    let y =
-      height * 0.52 -
-      noise(
-        x * 0.015
-      ) * 80;
-
-    vertex(
-      x,
-      y
-    );
-  }
-
-  vertex(
-    width,
-    height
-  );
-
-  vertex(
-    0,
-    height
-  );
-
-  endShape(CLOSE);
-
-
-  // ground
-
-  fill(
-    8,
-    16,
-    28
-  );
-
-  rect(
-    0,
-    height - 125,
-    width,
-    125
-  );
-
-
-  stroke(
-    70,
-    130,
-    210,
-    35
-  );
-
-  line(
-    0,
-    height - 130,
-    width,
-    height - 130
-  );
-
-  noStroke();
-}
-
-
-// =====================================================
-// DRAW GAME
-// =====================================================
-
-function drawGame() {
-
-  drawEnemies();
-
-  drawMissiles();
-
-  drawEffects();
-
-  drawParticles();
-
-  drawCastle();
-
-  drawUI();
-}
-
-
-// =====================================================
-// CASTLE
-// =====================================================
-
-function drawCastle() {
-
-  let x = castle.x;
-  let y = castle.y;
-
-  push();
-
-  rectMode(CENTER);
-
-
-  // shadow
-
-  fill(
-    0,
-    0,
-    0,
-    100
-  );
-
-  rect(
-    x,
-    y + 8,
-    155,
-    78,
-    8
-  );
-
-
-  // main castle
-
-  fill(
-    72,
-    83,
-    112
-  );
-
-  rect(
-    x,
-    y,
-    135,
-    65,
-    4
-  );
-
-
-  // side towers
-
-  fill(
-    88,
-    98,
-    130
-  );
-
-  rect(
-    x - 51,
-    y - 10,
-    35,
-    78
-  );
-
-  rect(
-    x + 51,
-    y - 10,
-    35,
-    78
-  );
-
-
-  // center tower
-
-  rect(
-    x,
-    y - 15,
-    45,
-    95
-  );
-
-
-  // roofs
-
-  fill(
-    40,
-    45,
-    75
-  );
-
-  triangle(
-    x - 69,
-    y - 49,
-    x - 51,
-    y - 76,
-    x - 33,
-    y - 49
-  );
-
-  triangle(
-    x + 33,
-    y - 49,
-    x + 51,
-    y - 76,
-    x + 69,
-    y - 49
-  );
-
-  triangle(
-    x - 23,
-    y - 62,
-    x,
-    y - 94,
-    x + 23,
-    y - 62
-  );
-
-
-  // windows
-
-  fill(
-    80,
-    210,
-    255
-  );
-
-  rect(
-    x - 51,
-    y - 18,
-    8,
-    17,
-    2
-  );
-
-  rect(
-    x + 51,
-    y - 18,
-    8,
-    17,
-    2
-  );
-
-  rect(
-    x,
-    y - 28,
-    11,
-    18,
-    2
-  );
-
-
-  // gate
-
-  fill(
-    27,
-    28,
-    42
-  );
-
-  arc(
-    x,
-    y + 30,
-    28,
-    40,
-    PI,
-    TWO_PI
-  );
-
-
-  // flag
-
-  stroke(
-    150,
-    100,
-    50
-  );
-
-  strokeWeight(2);
-
-  line(
-    x,
-    y - 94,
-    x,
-    y - 122
-  );
-
-  noStroke();
-
-  fill(
-    65,
-    150,
-    255
-  );
-
-  triangle(
-    x,
-    y - 122,
-    x + 19,
-    y - 116,
-    x,
-    y - 109
-  );
-
-
-  // HP BAR
-
-  let barW = 170;
-
-  fill(
-    0,
-    0,
-    0,
-    180
-  );
-
-  rect(
-    x,
-    y - 140,
-    barW,
-    11,
-    5
-  );
-
-  fill(
-    60,
-    220,
-    105
-  );
-
-  rect(
-    x -
-    barW / 2 +
-    barW *
-    castle.hp /
-    castle.maxHp /
-    2,
-
-    y - 140,
-
-    barW *
-    castle.hp /
-    castle.maxHp,
-
-    11,
-
-    5
-  );
-
-  fill(255);
-
-  textAlign(
-    CENTER,
-    CENTER
-  );
-
-  textSize(10);
-
-  text(
-    "CASTLE " +
-    floor(castle.hp),
-
-    x,
-    y - 140
-  );
-
-  pop();
-}
-
-
-// =====================================================
-// SPAWN
-// =====================================================
-
-function spawnEnemies() {
-
-  spawnTimer += deltaTime;
-
-
-  /*
-    最初は約2秒に1体。
-
-    レベルが上がると
-    少しずつ早くなる。
-  */
-
-  let interval =
-    max(
-      850,
-      2000 -
-      (level - 1) * 70
-    );
-
-
-  if (
-    spawnTimer <
-    interval
-  ) {
-    return;
-  }
-
-
-  spawnTimer = 0;
-
-
-  /*
-    序盤は絶対に1体。
-
-    Lv5以降から
-    低確率で2体。
-  */
-
-  let amount = 1;
-
-
-  if (
-    level >= 5 &&
-    random() < 0.12
-  ) {
-
-    amount = 2;
-  }
-
-
-  if (
-    level >= 10 &&
-    random() < 0.18
-  ) {
-
-    amount = 2;
-  }
-
-
-  if (
-    level >= 18 &&
-    random() < 0.20
-  ) {
-
-    amount = 3;
-  }
-
-
-  for (
-    let i = 0;
-    i < amount;
-    i++
-  ) {
-
-    createEnemy();
-  }
-}
-
-
-// =====================================================
-// CREATE ENEMY
-// =====================================================
-
-function createEnemy() {
-
-  let roll =
-    random();
-
-  let type;
-
-
-  if (
-    roll < 0.72
-  ) {
-
-    type = "normal";
-
-  } else if (
-    roll < 0.94
-  ) {
-
-    type = "fast";
-
-  } else {
-
-    type = "tank";
-  }
-
-
-  let hp;
-  let speed;
-  let radius;
-  let damage;
-  let reward;
-  let color;
-
-
-  // NORMAL
-
-  if (
-    type === "normal"
-  ) {
-
-    hp =
-      38 +
-      level * 7;
-
-    speed =
-      0.55 +
-      level * 0.012;
-
-    radius = 15;
-
-    damage =
-      1.0 +
-      level * 0.035;
-
-    reward = 1;
-
-    color = [
-      185,
-      60,
-      75
-    ];
-  }
-
-
-  // FAST
-
-  else if (
-    type === "fast"
-  ) {
-
-    hp =
-      60 +
-      level * 9;
-
-    speed =
-      0.82 +
-      level * 0.015;
-
-    radius = 12;
-
-    damage =
-      1.4 +
-      level * 0.04;
-
-    reward = 2;
-
-    color = [
-      230,
-      110,
-      55
-    ];
-  }
-
-
-  // TANK
-
-  else {
-
-    hp =
-      160 +
-      level * 22;
-
-    speed =
-      0.32 +
-      level * 0.007;
-
-    radius = 24;
-
-    damage =
-      2.5 +
-      level * 0.06;
-
-    reward = 4;
-
-    color = [
-      105,
-      60,
-      165
-    ];
-  }
-
-
-  enemies.push({
-
-    // ★ 必ず画面のすぐ上から出す
-    x: random(
-      25,
-      width - 25
-    ),
-
-    y:
-      -radius -
-      random(
-        20,
-        70
-      ),
-
-    hp: hp,
-
-    maxHp: hp,
-
-    speed: speed,
-
-    radius: radius,
-
-    damage: damage,
-
-    xp: reward,
-
-    type: type,
-
-    color: color,
-
-    wobble:
-      random(TWO_PI),
-
-    slow: 0
-  });
-}
-
-
-// =====================================================
-// ENEMY UPDATE
-// =====================================================
-
-function updateEnemies() {
-
-  for (
-    let i =
-      enemies.length - 1;
-    i >= 0;
-    i--
-  ) {
-
-    let e =
-      enemies[i];
-
-
-    let angle =
-      atan2(
-        castle.y - e.y,
-        castle.x - e.x
-      );
-
-
-    let speed =
-      e.speed;
-
-
-    if (
-      e.slow > 0
-    ) {
-
-      speed *= 0.45;
-
-      e.slow -=
-        deltaTime;
-    }
-
-
-    e.x +=
-      cos(angle) *
-      speed;
-
-    e.y +=
-      sin(angle) *
-      speed;
-
-
-    // slight wobble
-
-    e.x +=
-      sin(
-        frameCount *
-        0.025 +
-        e.wobble
-      ) *
-      0.08;
-
-
-    // castle contact
-
-    if (
-      dist(
-        e.x,
-        e.y,
-        castle.x,
-        castle.y
-      ) <
-      e.radius + 38
-    ) {
-
-      castle.hp -=
-        e.damage *
-        deltaTime /
-        1000;
-    }
-  }
-}
-
-
-// =====================================================
-// DRAW ENEMIES
-// =====================================================
-
-function drawEnemies() {
-
-  for (
-    let e of enemies
-  ) {
-
-    push();
-
-    translate(
-      e.x,
-      e.y
-    );
-
-
-    // shadow
-
-    noStroke();
-
-    fill(
-      0,
-      0,
-      0,
-      80
-    );
-
-    ellipse(
-      3,
-      5,
-      e.radius * 2
-    );
-
-
-    // HP bar
-
-    fill(
-      0,
-      0,
-      0,
-      180
-    );
-
-    rectMode(CENTER);
-
-    rect(
-      0,
-      -e.radius - 9,
-      e.radius * 2.4,
-      5,
-      3
-    );
-
-    fill(
-      240,
-      70,
-      80
-    );
-
-    rect(
-      -e.radius *
-      1.2 +
-      e.radius *
-      2.4 *
-      (e.hp /
-        e.maxHp) /
-      2,
-
-      -e.radius - 9,
-
-      e.radius *
-      2.4 *
-      (e.hp /
-        e.maxHp),
-
-      5,
-
-      3
-    );
-
-
-    // body
-
-    fill(
-      e.color[0],
-      e.color[1],
-      e.color[2]
-    );
-
-    ellipse(
-      0,
-      0,
-      e.radius * 2
-    );
-
-
-    // tank ring
-
-    if (
-      e.type === "tank"
-    ) {
-
-      noFill();
-
-      stroke(
-        190,
-        130,
-        255,
-        180
-      );
-
-      strokeWeight(2);
-
-      ellipse(
-        0,
-        0,
-        e.radius * 2.5
-      );
-
-      noStroke();
-    }
-
-
-    // horns
-
-    fill(
-      100,
-      35,
-      50
-    );
-
-    triangle(
-      -e.radius * 0.65,
-      -e.radius * 0.4,
-
-      -e.radius * 0.25,
-      -e.radius * 1.15,
-
-      0,
-      -e.radius * 0.35
-    );
-
-    triangle(
-      e.radius * 0.65,
-      -e.radius * 0.4,
-
-      e.radius * 0.25,
-      -e.radius * 1.15,
-
-      0,
-      -e.radius * 0.35
-    );
-
-
-    // eyes
-
-    fill(
-      255,
-      220,
-      70
-    );
-
-    ellipse(
-      -e.radius * 0.3,
-      -2,
-      5
-    );
-
-    ellipse(
-      e.radius * 0.3,
-      -2,
-      5
-    );
-
-
-    pop();
-  }
-}
-
-
-// =====================================================
-// AUTO SPELL
-// =====================================================
-
-function autoSpell() {
-
-  if (
-    millis() -
-    spellTimer <
-    magic.cooldown
-  ) {
-    return;
-  }
-
-
-  if (
-    enemies.length === 0
-  ) {
-    return;
-  }
-
-
-  spellTimer =
-    millis();
-
-
-  // 城に近い敵を優先
-
-  let targets =
-    [...enemies];
-
-
-  targets.sort(
-    (a, b) => {
-
-      let da =
-        dist(
-          a.x,
-          a.y,
-          castle.x,
-          castle.y
-        );
-
-      let db =
-        dist(
-          b.x,
-          b.y,
-          castle.x,
-          castle.y
-        );
-
-      return da - db;
-    }
-  );
-
-
-  for (
-    let i = 0;
-    i < magic.missileCount;
-    i++
-  ) {
-
-    let target =
-      targets[
-        i %
-        targets.length
-      ];
-
-
-    missiles.push({
-
-      x:
-        castle.x,
-
-      y:
-        castle.y - 95,
-
-      target:
-        target,
-
-      speed:
-        magic.missileSpeed,
-
-      damage:
-        magic.damage,
-
-      pierce:
-        magic.pierce,
-
-      hit: [],
-
-      life: 5000
-    });
-  }
-}
-
-
-// =====================================================
-// MISSILE UPDATE
-// =====================================================
-
-function updateMissiles() {
-
-  for (
-    let i =
-      missiles.length - 1;
-    i >= 0;
-    i--
-  ) {
-
-    let m =
-      missiles[i];
-
-
-    m.life -=
-      deltaTime;
-
-
-    if (
-      m.life <= 0
-    ) {
-
-      missiles.splice(
-        i,
-        1
-      );
-
-      continue;
-    }
-
-
-    if (
-      !enemies.includes(
-        m.target
-      )
-    ) {
-
-      missiles.splice(
-        i,
-        1
-      );
-
-      continue;
-    }
-
-
-    let angle =
-      atan2(
-        m.target.y - m.y,
-        m.target.x - m.x
-      );
-
-
-    m.x +=
-      cos(angle) *
-      m.speed;
-
-    m.y +=
-      sin(angle) *
-      m.speed;
-
-
-    // trail
-
-    particles.push({
-
-      x: m.x,
-
-      y: m.y,
-
-      vx: 0,
-
-      vy: 0,
-
-      life: 100,
-
-      size:
-        random(
-          3,
-          6
-        )
-    });
-
-
-    // collision
-
-    let remove =
-      false;
-
-
-    for (
-      let j =
-        enemies.length - 1;
-      j >= 0;
-      j--
-    ) {
-
-      let e =
-        enemies[j];
-
-
-      if (
-        m.hit.includes(e)
-      ) {
-        continue;
-      }
-
-
-      let d =
-        dist(
-          m.x,
-          m.y,
-          e.x,
-          e.y
-        );
-
-
-      if (
-        d <
-        e.radius + 9
-      ) {
-
-        m.hit.push(e);
-
-
-        e.hp -=
-          m.damage;
-
-
-        // ICE
-
-        if (
-          magic.ice > 0
-        ) {
-
-          e.slow =
-            1000 *
-            magic.ice;
-        }
-
-
-        // EXPLOSION
-
-        if (
-          magic.explosion > 0
-        ) {
-
-          damageArea(
-            e,
-            magic.explosion
-          );
-        }
-
-
-        createExplosion(
-          e.x,
-          e.y,
-          10
-        );
-
-
-        // ★ 即時XP
-
-        if (
-          e.hp <= 0
-        ) {
-
-          killEnemy(e);
-        }
-
-
-        if (
-          m.pierce > 0
-        ) {
-
-          m.pierce--;
-
-        } else {
-
-          remove = true;
-
-          break;
-        }
-      }
-    }
-
-
-    if (
-      remove
-    ) {
-
-      missiles.splice(
-        i,
-        1
-      );
-    }
-  }
-}
-
-
-// =====================================================
-// DRAW MISSILES
-// =====================================================
-
-function drawMissiles() {
-
-  for (
-    let m of missiles
-  ) {
-
-    push();
-
-    let angle =
-      atan2(
-        m.target.y - m.y,
-        m.target.x - m.x
-      );
-
-    translate(
-      m.x,
-      m.y
-    );
-
-    rotate(angle);
-
-
-    noStroke();
-
-
-    fill(
-      60,
-      200,
-      255,
-      40
-    );
-
-    ellipse(
-      0,
-      0,
-      32
-    );
-
-
-    fill(
-      80,
-      220,
-      255
-    );
-
-    ellipse(
-      0,
-      0,
-      11
-    );
-
-
-    fill(
-      235,
-      255,
-      255
-    );
-
-    ellipse(
-      3,
-      -2,
-      4
-    );
-
-
-    fill(
-      50,
-      160,
-      255,
-      160
-    );
-
-    triangle(
-      -4,
-      0,
-      -25,
-      -6,
-      -25,
-      6
-    );
-
-
-    pop();
-  }
-}
-
-
-// =====================================================
-// SPECIAL MAGIC
-// =====================================================
-
-function updateSpecialMagic() {
-
-  // LIGHTNING
-
-  if (
-    magic.lightning > 0 &&
-    enemies.length > 0 &&
-    millis() -
-    specialTimer >
-    1300
-  ) {
-
-    specialTimer =
-      millis();
-
-
-    let count =
-      min(
-        magic.lightning,
-        enemies.length
-      );
-
-
-    for (
-      let i = 0;
-      i < count;
-      i++
-    ) {
-
-      let e =
-        random(
-          enemies
-        );
-
-
-      e.hp -=
-        25 +
-        level * 5;
-
-
-      effects.push({
-
-        type:
-          "lightning",
-
-        x:
-          e.x,
-
-        y:
-          e.y,
-
-        life:
-          300
-      });
-
-
-      if (
-        e.hp <= 0
-      ) {
-
-        killEnemy(e);
-      }
-    }
-  }
-
-
-  // METEOR
-
-  if (
-    magic.meteor > 0 &&
-    enemies.length > 0 &&
-    millis() -
-    specialTimer >
-    5000
-  ) {
-
-    specialTimer =
-      millis();
-
-
-    let e =
-      random(
-        enemies
-      );
-
-
-    effects.push({
-
-      type:
-        "meteor",
-
-      x:
-        e.x,
-
-      y:
-        e.y,
-
-      life:
-        900,
-
-      damage:
-        90 *
-        magic.meteor,
-
-      hit: false
-    });
-  }
-
-
-  // TORNADO
-
-  if (
-    magic.tornado > 0
-  ) {
-
-    for (
-      let e of enemies
-    ) {
-
-      if (
-        random() <
-        0.008 *
-        magic.tornado
-      ) {
-
-        e.y -=
-          15 *
-          magic.tornado;
-      }
-    }
-  }
-
-
-  // HOLY
-
-  if (
-    magic.holy > 0
-  ) {
-
-    for (
-      let e of [
-        ...enemies
-      ]
-    ) {
-
-      let d =
-        dist(
-          e.x,
-          e.y,
-          castle.x,
-          castle.y
-        );
-
-
-      if (
-        d < 170 &&
-        random() <
-        0.007 *
-        magic.holy
-      ) {
-
-        e.hp -=
-          6 *
-          magic.holy;
-
-
-        effects.push({
-
-          type:
-            "holy",
-
-          x:
-            e.x,
-
-          y:
-            e.y,
-
-          life:
-            250
-        });
-
-
-        if (
-          e.hp <= 0
-        ) {
-
-          killEnemy(e);
-        }
-      }
-    }
-  }
-}
-
-
-// =====================================================
-// AREA DAMAGE
-// =====================================================
-
-function damageArea(
-  target,
-  amount
-) {
-
-  for (
-    let e of [
-      ...enemies
-    ]
-  ) {
-
-    if (
-      e === target
-    ) {
-      continue;
-    }
-
-
-    let d =
-      dist(
-        target.x,
-        target.y,
-        e.x,
-        e.y
-      );
-
-
-    if (
-      d < 65
-    ) {
-
-      e.hp -=
-        amount;
-
-
-      if (
-        e.hp <= 0
-      ) {
-
-        killEnemy(e);
-      }
-    }
-  }
-}
-
-
-// =====================================================
-// KILL
-// =====================================================
-
-function killEnemy(e) {
-
-  let index =
-    enemies.indexOf(e);
-
-
-  if (
-    index === -1
-  ) {
-    return;
-  }
-
-
-  createExplosion(
-    e.x,
-    e.y,
-    18
-  );
-
-
-  // ★ 倒した瞬間にXP
-
-  xp +=
-    e.xp;
-
-
-  enemies.splice(
-    index,
-    1
-  );
-
-
-  // level up
-
-  if (
-    xp >= xpNeed
-  ) {
-
-    xp -=
-      xpNeed;
-
-    levelUp();
-  }
-}
-
-
-// =====================================================
-// LEVEL UP
-// =====================================================
-
-function levelUp() {
-
-  level++;
-
-
-  // 6 → 9 → 12 → 15 ...
-
-  xpNeed =
-    6 +
-    (level - 1) * 3;
-
-
-  let all = [
-
-    {
-      name:
-        "🔥 ファイア",
-
-      desc:
-        "攻撃力 +25",
-
-      type:
-        "damage"
-    },
-
-    {
-      name:
-        "⚡ サンダー",
-
-      desc:
-        "雷が自動で落ちる",
-
-      type:
-        "lightning"
-    },
-
-    {
-      name:
-        "❄️ アイス",
-
-      desc:
-        "敵を大幅に減速",
-
-      type:
-        "ice"
-    },
-
-    {
-      name:
-        "💥 爆裂",
-
-      desc:
-        "着弾時に周囲へ追加ダメージ",
-
-      type:
-        "explosion"
-    },
-
-    {
-      name:
-        "🟣 貫通",
-
-      desc:
-        "魔法が敵を追加で貫通",
-
-      type:
-        "pierce"
-    },
-
-    {
-      name:
-        "⚡ 高速詠唱",
-
-      desc:
-        "攻撃間隔を短縮",
-
-      type:
-        "cooldown"
-    },
-
-    {
-      name:
-        "☄️ メテオ",
-
-      desc:
-        "巨大な隕石を落とす",
-
-      type:
-        "meteor"
-    },
-
-    {
-      name:
-        "🌪️ 竜巻",
-
-      desc:
-        "敵を上方向へ押し戻す",
-
-      type:
-        "tornado"
-    },
-
-    {
-      name:
-        "✨ 聖光",
-
-      desc:
-        "城の近くの敵を攻撃",
-
-      type:
-        "holy"
-    },
-
-    {
-      name:
-        "❤️ 城再生",
-
-      desc:
-        "城HPが徐々に回復",
-
-      type:
-        "heal"
-    },
-
-    {
-      name:
-        "🔮 多重魔弾",
-
-      desc:
-        "同時に撃つ魔法 +1",
-
-      type:
-        "count"
-    }
-  ];
-
-
-  shuffle(
-    all,
-    true
-  );
-
-
-  upgrades =
-    all.slice(
-      0,
-      3
-    );
-
-
-  gameState =
-    "levelup";
-}
-
-
-// =====================================================
-// LEVEL UP SCREEN
-// =====================================================
-
-function drawLevelUp() {
-
-  fill(
-    3,
-    7,
-    20,
-    245
-  );
-
-  rect(
-    0,
-    0,
-    width,
-    height
-  );
-
-
-  textAlign(
-    CENTER,
-    CENTER
-  );
-
-
-  fill(
-    255,
-    220,
-    70
-  );
-
-  textSize(34);
-
-  text(
-    "LEVEL UP",
-    width / 2,
-    height * 0.14
-  );
-
-
-  fill(
-    180,
-    205,
-    235
-  );
-
-  textSize(14);
-
-  text(
-    "魔法を1つ選択",
-    width / 2,
-    height * 0.20
-  );
-
-
-  let cardX = 18;
-
-  let cardW =
-    width - 36;
-
-  let cardH = 88;
-
-
-  for (
-    let i = 0;
-    i < upgrades.length;
-    i++
-  ) {
-
-    let y =
-      height * 0.27 +
-      i * 108;
-
-
-    fill(
-      18,
-      34,
-      67
-    );
-
-    stroke(
-      70,
-      150,
-      255
-    );
-
-    strokeWeight(2);
-
-
-    rect(
-      cardX,
-      y,
-      cardW,
-      cardH,
-      14
-    );
-
-
-    noStroke();
-
-
-    fill(255);
-
-    textSize(19);
-
-    text(
-      upgrades[i].name,
-      width / 2,
-      y + 27
-    );
-
-
-    fill(
-      160,
-      190,
-      225
-    );
-
-    textSize(12);
-
-    text(
-      upgrades[i].desc,
-      width / 2,
-      y + 59
-    );
-  }
-}
-
-
-// =====================================================
-// INPUT
-// =====================================================
-
-function mousePressed() {
-
-  if (
-    gameState !==
-    "levelup"
-  ) {
-
-    if (
-      gameState ===
-      "gameover"
-    ) {
-
-      restart();
-    }
-
-    return;
-  }
-
-
-  let cardX = 18;
-
-  let cardW =
-    width - 36;
-
-  let cardH = 88;
-
-
-  for (
-    let i = 0;
-    i < upgrades.length;
-    i++
-  ) {
-
-    let y =
-      height * 0.27 +
-      i * 108;
-
-
-    if (
-      mouseX >= cardX &&
-      mouseX <=
-      cardX + cardW &&
-      mouseY >= y &&
-      mouseY <=
-      y + cardH
-    ) {
-
-      applyUpgrade(
-        upgrades[i]
-      );
-
-      gameState =
-        "play";
-
-      spellTimer =
-        millis();
-
-      break;
-    }
-  }
-}
-
-
-// =====================================================
-// UPGRADE
-// =====================================================
-
-function applyUpgrade(u) {
-
-  if (
-    u.type ===
-    "damage"
-  ) {
-
-    magic.damage +=
-      25;
-  }
-
-
-  if (
-    u.type ===
-    "lightning"
-  ) {
-
-    magic.lightning++;
-  }
-
-
-  if (
-    u.type ===
-    "ice"
-  ) {
-
-    magic.ice++;
-  }
-
-
-  if (
-    u.type ===
-    "explosion"
-  ) {
-
-    magic.explosion +=
-      20;
-  }
-
-
-  if (
-    u.type ===
-    "pierce"
-  ) {
-
-    magic.pierce++;
-  }
-
-
-  if (
-    u.type ===
-    "cooldown"
-  ) {
-
-    magic.cooldown =
-      max(
-        650,
-        magic.cooldown - 220
-      );
-  }
-
-
-  if (
-    u.type ===
-    "meteor"
-  ) {
-
-    magic.meteor++;
-  }
-
-
-  if (
-    u.type ===
-    "tornado"
-  ) {
-
-    magic.tornado++;
-  }
-
-
-  if (
-    u.type ===
-    "holy"
-  ) {
-
-    magic.holy++;
-  }
-
-
-  if (
-    u.type ===
-    "heal"
-  ) {
-
-    magic.heal++;
-  }
-
-
-  if (
-    u.type ===
-    "count"
-  ) {
-
-    magic.missileCount++;
-  }
-}
-
-
-// =====================================================
-// EFFECTS
-// =====================================================
-
-function updateEffects() {
-
-  for (
-    let i =
-      effects.length - 1;
-    i >= 0;
-    i--
-  ) {
-
-    let e =
-      effects[i];
-
-
-    // meteor impact
-
-    if (
-      e.type ===
-      "meteor" &&
-      e.life < 400 &&
-      !e.hit
-    ) {
-
-      e.hit = true;
-
-
-      for (
-        let enemy of [
-          ...enemies
-        ]
-      ) {
-
-        if (
-          dist(
-            e.x,
-            e.y,
-            enemy.x,
-            enemy.y
-          ) < 80
-        ) {
-
-          enemy.hp -=
-            e.damage;
-
-
-          if (
-            enemy.hp <= 0
-          ) {
-
-            killEnemy(
-              enemy
-            );
-          }
-        }
-      }
-
-
-      createExplosion(
-        e.x,
-        e.y,
-        30
-      );
-    }
-
-
-    e.life -=
-      deltaTime;
-
-
-    if (
-      e.life <= 0
-    ) {
-
-      effects.splice(
-        i,
-        1
-      );
-    }
-  }
-}
-
-
-// =====================================================
-// DRAW EFFECTS
-// =====================================================
-
-function drawEffects() {
-
-  for (
-    let e of effects
-  ) {
-
-
-    if (
-      e.type ===
-      "lightning"
-    ) {
-
-      stroke(
-        100,
-        220,
-        255,
-        230
-      );
-
-      strokeWeight(4);
-
-      line(
-        e.x,
-        e.y - 230,
-        e.x,
-        e.y
-      );
-
-      noStroke();
-    }
-
-
-    if (
-      e.type ===
-      "meteor"
-    ) {
-
-      let alpha =
-        map(
-          e.life,
-          0,
-          900,
-          0,
-          210
-        );
-
-
-      fill(
-        255,
-        80,
-        20,
-        alpha
-      );
-
-      ellipse(
-        e.x,
-        e.y,
-        90
-      );
-
-
-      fill(
-        255,
-        220,
-        70,
-        alpha
-      );
-
-      ellipse(
-        e.x,
-        e.y,
-        40
-      );
-    }
-
-
-    if (
-      e.type ===
-      "holy"
-    ) {
-
-      noFill();
-
-      stroke(
-        255,
-        240,
-        100,
-        210
-      );
-
-      strokeWeight(4);
-
-      ellipse(
-        e.x,
-        e.y,
-        45
-      );
-
-      noStroke();
-    }
-  }
-}
-
-
-// =====================================================
-// PARTICLES
-// =====================================================
-
-function createExplosion(
-  x,
-  y,
-  amount
-) {
-
-  for (
-    let i = 0;
-    i < amount;
-    i++
-  ) {
-
-    let angle =
-      random(TWO_PI);
-
-    let speed =
-      random(
-        1,
-        4
-      );
-
-
-    particles.push({
-
-      x: x,
-
-      y: y,
-
-      vx:
-        cos(angle) *
-        speed,
-
-      vy:
-        sin(angle) *
-        speed,
-
-      life:
-        random(
-          250,
-          550
-        ),
-
-      size:
-        random(
-          3,
-          7
-        )
-    });
-  }
-}
-
-
-function updateParticles() {
-
-  for (
-    let i =
-      particles.length - 1;
-    i >= 0;
-    i--
-  ) {
-
-    let p =
-      particles[i];
-
-
-    p.x +=
-      p.vx;
-
-    p.y +=
-      p.vy;
-
-
-    p.vx *=
-      0.97;
-
-    p.vy *=
-      0.97;
-
-
-    p.life -=
-      deltaTime;
-
-
-    if (
-      p.life <= 0
-    ) {
-
-      particles.splice(
-        i,
-        1
-      );
-    }
-  }
-}
-
-
-function drawParticles() {
-
-  noStroke();
-
-
-  for (
-    let p of particles
-  ) {
-
-    let alpha =
-      map(
-        p.life,
-        0,
-        550,
-        0,
-        220
-      );
-
-
-    fill(
-      80,
-      210,
-      255,
-      alpha
-    );
-
-
-    ellipse(
-      p.x,
-      p.y,
-      p.size
-    );
-  }
-}
-
-
-// =====================================================
-// UI
-// =====================================================
-
-function drawUI() {
-
-  textAlign(
-    LEFT,
-    TOP
-  );
-
-
-  // LEVEL
-
-  fill(255);
-
-  textSize(21);
-
-  text(
-    "Lv." +
-    level,
-    14,
-    12
-  );
-
-
-  // MAGIC
-
-  fill(
-    170,
-    195,
-    225
-  );
-
-  textSize(11);
-
-  text(
-    "DMG " +
-    magic.damage,
-    14,
-    40
-  );
-
-
-  text(
-    "SPELL ×" +
-    magic.missileCount,
-    14,
-    56
-  );
-
-
-  // XP BAR
-
-  fill(
-    20,
-    30,
-    55
-  );
-
-  rect(
-    14,
-    height - 27,
-    width - 28,
-    9,
-    5
-  );
-
-
-  fill(
-    70,
-    190,
-    255
-  );
-
-  rect(
-    14,
-    height - 27,
-
-    (width - 28) *
-    xp /
-    xpNeed,
-
-    9,
-
-    5
-  );
-
-
-  fill(
-    175,
-    200,
-    230
-  );
-
-  textAlign(
-    CENTER,
-    BOTTOM
-  );
-
-  textSize(11);
-
-  text(
-    "EXP " +
-    xp +
-    " / " +
-    xpNeed,
-
-    width / 2,
-    height - 32
-  );
-}
-
-
-// =====================================================
-// GAME OVER
-// =====================================================
-
-function drawGameOver() {
-
-  fill(
-    0,
-    0,
-    10,
-    230
-  );
-
-  rect(
-    0,
-    0,
-    width,
-    height
-  );
-
-
-  textAlign(
-    CENTER,
-    CENTER
-  );
-
-
-  fill(
-    255,
-    70,
-    90
-  );
-
-  textSize(32);
-
-  text(
-    "CASTLE FALLEN",
-    width / 2,
-    height * 0.42
-  );
-
-
-  fill(240);
-
-  textSize(18);
-
-  text(
-    "LEVEL " +
-    level,
-    width / 2,
-    height * 0.50
-  );
-
-
-  fill(
-    165,
-    190,
-    220
-  );
-
-  textSize(14);
-
-  text(
-    "タップで再挑戦",
-    width / 2,
-    height * 0.58
-  );
-}
-
-
-// =====================================================
-// RESTART
-// =====================================================
-
-function restart() {
-
-  enemies = [];
-
-  missiles = [];
-
-  particles = [];
-
-  effects = [];
-
-
-  level = 1;
-
-  xp = 0;
-
-  xpNeed = 6;
-
-
-  castle.hp =
-    castle.maxHp;
-
-
-  magic = {
-
-    damage: 45,
-
-    cooldown: 2000,
-
-    missileSpeed: 7,
-
-    missileCount: 1,
-
-    pierce: 0,
-
-    explosion: 0,
-
-    lightning: 0,
-
-    ice: 0,
-
-    meteor: 0,
-
-    tornado: 0,
-
-    holy: 0,
-
-    heal: 0
-  };
-
-
-  spawnTimer = 0;
-
-  spellTimer =
-    millis();
-
-  specialTimer =
-    millis();
-
-
-  gameState =
-    "play";
-}
-
-
-// =====================================================
-// RESIZE
-// =====================================================
-
-function windowResized() {
-
-  resizeCanvas(
-    min(
-      windowWidth,
-      480
-    ),
-    windowHeight
-  );
-
-
-  castle.x =
-    width / 2;
-
-  castle.y =
-    height - 75;
-}
-</script>
-
+  <!-- ソースコード表示領域（ゲーム画面の下） -->
   <div class="code-container">
-    <h3>ソースコード</h3>
-    <pre><code class="language-javascript">// =====================================================
+    <div class="code-header">
+      <span>ソースコード</span>
+      <button class="copy-btn" id="copy-btn" title="コードをコピー" aria-label="コードをコピー">
+        <svg id="copy-icon" viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+    </div>
+    <pre><code id="source-code" class="language-javascript">// =====================================================
 // CASTLE MAGIC
 // p5.js Mobile Vertical Game
 // =====================================================
@@ -5862,5 +3033,2957 @@ function windowResized() {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+  <script>
+    // コピー機能の実装
+    const copyBtn = document.getElementById("copy-btn");
+    const copyIcon = document.getElementById("copy-icon");
+    const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+    const checkSvg = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+
+    copyBtn.addEventListener("click", function() {
+      const codeText = document.getElementById("source-code").textContent;
+      navigator.clipboard.writeText(codeText).then(function() {
+        copyIcon.innerHTML = checkSvg;
+        copyBtn.style.color = "#4fc3f7";
+        setTimeout(function() {
+          copyIcon.innerHTML = originalSvg;
+          copyBtn.style.color = "";
+        }, 2000);
+      });
+    });
+
+    // 生成されたキャンバスを #game-container の中に格納する
+    function ensureCanvasInContainer() {
+      const container = document.getElementById("game-container");
+      const canvas = document.querySelector("canvas");
+      if (canvas && canvas.parentElement !== container) {
+        container.appendChild(canvas);
+      }
+    }
+    const canvasObserver = new MutationObserver(function() {
+      ensureCanvasInContainer();
+    });
+    canvasObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("load", ensureCanvasInContainer);
+  </script>
+
+  <!-- 生徒のゲームスクリプト -->
+  <script>// =====================================================
+// CASTLE MAGIC
+// p5.js Mobile Vertical Game
+// =====================================================
+
+let castle;
+
+let enemies = [];
+let missiles = [];
+let particles = [];
+let effects = [];
+
+let level = 1;
+let xp = 0;
+let xpNeed = 6;
+
+let gameState = "play";
+
+let spawnTimer = 0;
+let spellTimer = 0;
+let specialTimer = 0;
+
+let upgrades = [];
+
+
+// =====================================================
+// PLAYER / MAGIC
+// =====================================================
+
+let magic = {
+  damage: 45,
+
+  cooldown: 2000,
+
+  missileSpeed: 7,
+
+  missileCount: 1,
+
+  pierce: 0,
+
+  explosion: 0,
+
+  lightning: 0,
+
+  ice: 0,
+
+  meteor: 0,
+
+  tornado: 0,
+
+  holy: 0,
+
+  heal: 0
+};
+
+
+// =====================================================
+// SETUP
+// =====================================================
+
+function setup() {
+
+  createCanvas(
+    min(windowWidth, 480),
+    windowHeight
+  );
+
+  castle = {
+    x: width / 2,
+
+    y: height - 75,
+
+    width: 135,
+
+    height: 65,
+
+    hp: 2000,
+
+    maxHp: 2000
+  };
+
+  spellTimer = millis();
+
+  specialTimer = millis();
+
+  textFont("sans-serif");
+}
+
+
+// =====================================================
+// DRAW
+// =====================================================
+
+function draw() {
+
+  drawBackground();
+
+  if (gameState === "play") {
+
+    updateGame();
+
+    drawGame();
+
+  } else if (gameState === "levelup") {
+
+    drawGame();
+
+    drawLevelUp();
+
+  } else if (gameState === "gameover") {
+
+    drawGame();
+
+    drawGameOver();
+  }
+}
+
+
+// =====================================================
+// GAME UPDATE
+// =====================================================
+
+function updateGame() {
+
+  spawnEnemies();
+
+  updateEnemies();
+
+  autoSpell();
+
+  updateMissiles();
+
+  updateSpecialMagic();
+
+  updateEffects();
+
+  updateParticles();
+
+  if (magic.heal > 0) {
+
+    castle.hp = min(
+      castle.maxHp,
+      castle.hp +
+      magic.heal *
+      0.015 *
+      deltaTime
+    );
+  }
+
+  if (castle.hp <= 0) {
+
+    castle.hp = 0;
+
+    gameState = "gameover";
+  }
+}
+
+
+// =====================================================
+// BACKGROUND
+// =====================================================
+
+function drawBackground() {
+
+  background(
+    7,
+    12,
+    30
+  );
+
+
+  // sky gradient
+
+  for (
+    let y = 0;
+    y < height;
+    y += 4
+  ) {
+
+    let t = y / height;
+
+    let r = lerp(
+      8,
+      18,
+      t
+    );
+
+    let g = lerp(
+      15,
+      25,
+      t
+    );
+
+    let b = lerp(
+      42,
+      55,
+      t
+    );
+
+    stroke(
+      r,
+      g,
+      b
+    );
+
+    line(
+      0,
+      y,
+      width,
+      y
+    );
+  }
+
+  noStroke();
+
+
+  // moon
+
+  fill(
+    170,
+    200,
+    255,
+    35
+  );
+
+  ellipse(
+    width * 0.82,
+    95,
+    90
+  );
+
+  fill(
+    210,
+    225,
+    255,
+    100
+  );
+
+  ellipse(
+    width * 0.82,
+    95,
+    45
+  );
+
+
+  // stars
+
+  for (
+    let i = 0;
+    i < 35;
+    i++
+  ) {
+
+    let x =
+      (i * 97) % width;
+
+    let y =
+      (i * 137) %
+      (height * 0.65);
+
+    fill(
+      150,
+      200,
+      255,
+      80
+    );
+
+    ellipse(
+      x,
+      y,
+      2,
+      2
+    );
+  }
+
+
+  // distant mountains
+
+  fill(
+    12,
+    22,
+    45
+  );
+
+  beginShape();
+
+  vertex(
+    0,
+    height * 0.52
+  );
+
+  for (
+    let x = 0;
+    x <= width;
+    x += 30
+  ) {
+
+    let y =
+      height * 0.52 -
+      noise(
+        x * 0.015
+      ) * 80;
+
+    vertex(
+      x,
+      y
+    );
+  }
+
+  vertex(
+    width,
+    height
+  );
+
+  vertex(
+    0,
+    height
+  );
+
+  endShape(CLOSE);
+
+
+  // ground
+
+  fill(
+    8,
+    16,
+    28
+  );
+
+  rect(
+    0,
+    height - 125,
+    width,
+    125
+  );
+
+
+  stroke(
+    70,
+    130,
+    210,
+    35
+  );
+
+  line(
+    0,
+    height - 130,
+    width,
+    height - 130
+  );
+
+  noStroke();
+}
+
+
+// =====================================================
+// DRAW GAME
+// =====================================================
+
+function drawGame() {
+
+  drawEnemies();
+
+  drawMissiles();
+
+  drawEffects();
+
+  drawParticles();
+
+  drawCastle();
+
+  drawUI();
+}
+
+
+// =====================================================
+// CASTLE
+// =====================================================
+
+function drawCastle() {
+
+  let x = castle.x;
+  let y = castle.y;
+
+  push();
+
+  rectMode(CENTER);
+
+
+  // shadow
+
+  fill(
+    0,
+    0,
+    0,
+    100
+  );
+
+  rect(
+    x,
+    y + 8,
+    155,
+    78,
+    8
+  );
+
+
+  // main castle
+
+  fill(
+    72,
+    83,
+    112
+  );
+
+  rect(
+    x,
+    y,
+    135,
+    65,
+    4
+  );
+
+
+  // side towers
+
+  fill(
+    88,
+    98,
+    130
+  );
+
+  rect(
+    x - 51,
+    y - 10,
+    35,
+    78
+  );
+
+  rect(
+    x + 51,
+    y - 10,
+    35,
+    78
+  );
+
+
+  // center tower
+
+  rect(
+    x,
+    y - 15,
+    45,
+    95
+  );
+
+
+  // roofs
+
+  fill(
+    40,
+    45,
+    75
+  );
+
+  triangle(
+    x - 69,
+    y - 49,
+    x - 51,
+    y - 76,
+    x - 33,
+    y - 49
+  );
+
+  triangle(
+    x + 33,
+    y - 49,
+    x + 51,
+    y - 76,
+    x + 69,
+    y - 49
+  );
+
+  triangle(
+    x - 23,
+    y - 62,
+    x,
+    y - 94,
+    x + 23,
+    y - 62
+  );
+
+
+  // windows
+
+  fill(
+    80,
+    210,
+    255
+  );
+
+  rect(
+    x - 51,
+    y - 18,
+    8,
+    17,
+    2
+  );
+
+  rect(
+    x + 51,
+    y - 18,
+    8,
+    17,
+    2
+  );
+
+  rect(
+    x,
+    y - 28,
+    11,
+    18,
+    2
+  );
+
+
+  // gate
+
+  fill(
+    27,
+    28,
+    42
+  );
+
+  arc(
+    x,
+    y + 30,
+    28,
+    40,
+    PI,
+    TWO_PI
+  );
+
+
+  // flag
+
+  stroke(
+    150,
+    100,
+    50
+  );
+
+  strokeWeight(2);
+
+  line(
+    x,
+    y - 94,
+    x,
+    y - 122
+  );
+
+  noStroke();
+
+  fill(
+    65,
+    150,
+    255
+  );
+
+  triangle(
+    x,
+    y - 122,
+    x + 19,
+    y - 116,
+    x,
+    y - 109
+  );
+
+
+  // HP BAR
+
+  let barW = 170;
+
+  fill(
+    0,
+    0,
+    0,
+    180
+  );
+
+  rect(
+    x,
+    y - 140,
+    barW,
+    11,
+    5
+  );
+
+  fill(
+    60,
+    220,
+    105
+  );
+
+  rect(
+    x -
+    barW / 2 +
+    barW *
+    castle.hp /
+    castle.maxHp /
+    2,
+
+    y - 140,
+
+    barW *
+    castle.hp /
+    castle.maxHp,
+
+    11,
+
+    5
+  );
+
+  fill(255);
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+  textSize(10);
+
+  text(
+    "CASTLE " +
+    floor(castle.hp),
+
+    x,
+    y - 140
+  );
+
+  pop();
+}
+
+
+// =====================================================
+// SPAWN
+// =====================================================
+
+function spawnEnemies() {
+
+  spawnTimer += deltaTime;
+
+
+  /*
+    最初は約2秒に1体。
+
+    レベルが上がると
+    少しずつ早くなる。
+  */
+
+  let interval =
+    max(
+      850,
+      2000 -
+      (level - 1) * 70
+    );
+
+
+  if (
+    spawnTimer <
+    interval
+  ) {
+    return;
+  }
+
+
+  spawnTimer = 0;
+
+
+  /*
+    序盤は絶対に1体。
+
+    Lv5以降から
+    低確率で2体。
+  */
+
+  let amount = 1;
+
+
+  if (
+    level >= 5 &&
+    random() < 0.12
+  ) {
+
+    amount = 2;
+  }
+
+
+  if (
+    level >= 10 &&
+    random() < 0.18
+  ) {
+
+    amount = 2;
+  }
+
+
+  if (
+    level >= 18 &&
+    random() < 0.20
+  ) {
+
+    amount = 3;
+  }
+
+
+  for (
+    let i = 0;
+    i < amount;
+    i++
+  ) {
+
+    createEnemy();
+  }
+}
+
+
+// =====================================================
+// CREATE ENEMY
+// =====================================================
+
+function createEnemy() {
+
+  let roll =
+    random();
+
+  let type;
+
+
+  if (
+    roll < 0.72
+  ) {
+
+    type = "normal";
+
+  } else if (
+    roll < 0.94
+  ) {
+
+    type = "fast";
+
+  } else {
+
+    type = "tank";
+  }
+
+
+  let hp;
+  let speed;
+  let radius;
+  let damage;
+  let reward;
+  let color;
+
+
+  // NORMAL
+
+  if (
+    type === "normal"
+  ) {
+
+    hp =
+      38 +
+      level * 7;
+
+    speed =
+      0.55 +
+      level * 0.012;
+
+    radius = 15;
+
+    damage =
+      1.0 +
+      level * 0.035;
+
+    reward = 1;
+
+    color = [
+      185,
+      60,
+      75
+    ];
+  }
+
+
+  // FAST
+
+  else if (
+    type === "fast"
+  ) {
+
+    hp =
+      60 +
+      level * 9;
+
+    speed =
+      0.82 +
+      level * 0.015;
+
+    radius = 12;
+
+    damage =
+      1.4 +
+      level * 0.04;
+
+    reward = 2;
+
+    color = [
+      230,
+      110,
+      55
+    ];
+  }
+
+
+  // TANK
+
+  else {
+
+    hp =
+      160 +
+      level * 22;
+
+    speed =
+      0.32 +
+      level * 0.007;
+
+    radius = 24;
+
+    damage =
+      2.5 +
+      level * 0.06;
+
+    reward = 4;
+
+    color = [
+      105,
+      60,
+      165
+    ];
+  }
+
+
+  enemies.push({
+
+    // ★ 必ず画面のすぐ上から出す
+    x: random(
+      25,
+      width - 25
+    ),
+
+    y:
+      -radius -
+      random(
+        20,
+        70
+      ),
+
+    hp: hp,
+
+    maxHp: hp,
+
+    speed: speed,
+
+    radius: radius,
+
+    damage: damage,
+
+    xp: reward,
+
+    type: type,
+
+    color: color,
+
+    wobble:
+      random(TWO_PI),
+
+    slow: 0
+  });
+}
+
+
+// =====================================================
+// ENEMY UPDATE
+// =====================================================
+
+function updateEnemies() {
+
+  for (
+    let i =
+      enemies.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let e =
+      enemies[i];
+
+
+    let angle =
+      atan2(
+        castle.y - e.y,
+        castle.x - e.x
+      );
+
+
+    let speed =
+      e.speed;
+
+
+    if (
+      e.slow > 0
+    ) {
+
+      speed *= 0.45;
+
+      e.slow -=
+        deltaTime;
+    }
+
+
+    e.x +=
+      cos(angle) *
+      speed;
+
+    e.y +=
+      sin(angle) *
+      speed;
+
+
+    // slight wobble
+
+    e.x +=
+      sin(
+        frameCount *
+        0.025 +
+        e.wobble
+      ) *
+      0.08;
+
+
+    // castle contact
+
+    if (
+      dist(
+        e.x,
+        e.y,
+        castle.x,
+        castle.y
+      ) <
+      e.radius + 38
+    ) {
+
+      castle.hp -=
+        e.damage *
+        deltaTime /
+        1000;
+    }
+  }
+}
+
+
+// =====================================================
+// DRAW ENEMIES
+// =====================================================
+
+function drawEnemies() {
+
+  for (
+    let e of enemies
+  ) {
+
+    push();
+
+    translate(
+      e.x,
+      e.y
+    );
+
+
+    // shadow
+
+    noStroke();
+
+    fill(
+      0,
+      0,
+      0,
+      80
+    );
+
+    ellipse(
+      3,
+      5,
+      e.radius * 2
+    );
+
+
+    // HP bar
+
+    fill(
+      0,
+      0,
+      0,
+      180
+    );
+
+    rectMode(CENTER);
+
+    rect(
+      0,
+      -e.radius - 9,
+      e.radius * 2.4,
+      5,
+      3
+    );
+
+    fill(
+      240,
+      70,
+      80
+    );
+
+    rect(
+      -e.radius *
+      1.2 +
+      e.radius *
+      2.4 *
+      (e.hp /
+        e.maxHp) /
+      2,
+
+      -e.radius - 9,
+
+      e.radius *
+      2.4 *
+      (e.hp /
+        e.maxHp),
+
+      5,
+
+      3
+    );
+
+
+    // body
+
+    fill(
+      e.color[0],
+      e.color[1],
+      e.color[2]
+    );
+
+    ellipse(
+      0,
+      0,
+      e.radius * 2
+    );
+
+
+    // tank ring
+
+    if (
+      e.type === "tank"
+    ) {
+
+      noFill();
+
+      stroke(
+        190,
+        130,
+        255,
+        180
+      );
+
+      strokeWeight(2);
+
+      ellipse(
+        0,
+        0,
+        e.radius * 2.5
+      );
+
+      noStroke();
+    }
+
+
+    // horns
+
+    fill(
+      100,
+      35,
+      50
+    );
+
+    triangle(
+      -e.radius * 0.65,
+      -e.radius * 0.4,
+
+      -e.radius * 0.25,
+      -e.radius * 1.15,
+
+      0,
+      -e.radius * 0.35
+    );
+
+    triangle(
+      e.radius * 0.65,
+      -e.radius * 0.4,
+
+      e.radius * 0.25,
+      -e.radius * 1.15,
+
+      0,
+      -e.radius * 0.35
+    );
+
+
+    // eyes
+
+    fill(
+      255,
+      220,
+      70
+    );
+
+    ellipse(
+      -e.radius * 0.3,
+      -2,
+      5
+    );
+
+    ellipse(
+      e.radius * 0.3,
+      -2,
+      5
+    );
+
+
+    pop();
+  }
+}
+
+
+// =====================================================
+// AUTO SPELL
+// =====================================================
+
+function autoSpell() {
+
+  if (
+    millis() -
+    spellTimer <
+    magic.cooldown
+  ) {
+    return;
+  }
+
+
+  if (
+    enemies.length === 0
+  ) {
+    return;
+  }
+
+
+  spellTimer =
+    millis();
+
+
+  // 城に近い敵を優先
+
+  let targets =
+    [...enemies];
+
+
+  targets.sort(
+    (a, b) => {
+
+      let da =
+        dist(
+          a.x,
+          a.y,
+          castle.x,
+          castle.y
+        );
+
+      let db =
+        dist(
+          b.x,
+          b.y,
+          castle.x,
+          castle.y
+        );
+
+      return da - db;
+    }
+  );
+
+
+  for (
+    let i = 0;
+    i < magic.missileCount;
+    i++
+  ) {
+
+    let target =
+      targets[
+        i %
+        targets.length
+      ];
+
+
+    missiles.push({
+
+      x:
+        castle.x,
+
+      y:
+        castle.y - 95,
+
+      target:
+        target,
+
+      speed:
+        magic.missileSpeed,
+
+      damage:
+        magic.damage,
+
+      pierce:
+        magic.pierce,
+
+      hit: [],
+
+      life: 5000
+    });
+  }
+}
+
+
+// =====================================================
+// MISSILE UPDATE
+// =====================================================
+
+function updateMissiles() {
+
+  for (
+    let i =
+      missiles.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let m =
+      missiles[i];
+
+
+    m.life -=
+      deltaTime;
+
+
+    if (
+      m.life <= 0
+    ) {
+
+      missiles.splice(
+        i,
+        1
+      );
+
+      continue;
+    }
+
+
+    if (
+      !enemies.includes(
+        m.target
+      )
+    ) {
+
+      missiles.splice(
+        i,
+        1
+      );
+
+      continue;
+    }
+
+
+    let angle =
+      atan2(
+        m.target.y - m.y,
+        m.target.x - m.x
+      );
+
+
+    m.x +=
+      cos(angle) *
+      m.speed;
+
+    m.y +=
+      sin(angle) *
+      m.speed;
+
+
+    // trail
+
+    particles.push({
+
+      x: m.x,
+
+      y: m.y,
+
+      vx: 0,
+
+      vy: 0,
+
+      life: 100,
+
+      size:
+        random(
+          3,
+          6
+        )
+    });
+
+
+    // collision
+
+    let remove =
+      false;
+
+
+    for (
+      let j =
+        enemies.length - 1;
+      j >= 0;
+      j--
+    ) {
+
+      let e =
+        enemies[j];
+
+
+      if (
+        m.hit.includes(e)
+      ) {
+        continue;
+      }
+
+
+      let d =
+        dist(
+          m.x,
+          m.y,
+          e.x,
+          e.y
+        );
+
+
+      if (
+        d <
+        e.radius + 9
+      ) {
+
+        m.hit.push(e);
+
+
+        e.hp -=
+          m.damage;
+
+
+        // ICE
+
+        if (
+          magic.ice > 0
+        ) {
+
+          e.slow =
+            1000 *
+            magic.ice;
+        }
+
+
+        // EXPLOSION
+
+        if (
+          magic.explosion > 0
+        ) {
+
+          damageArea(
+            e,
+            magic.explosion
+          );
+        }
+
+
+        createExplosion(
+          e.x,
+          e.y,
+          10
+        );
+
+
+        // ★ 即時XP
+
+        if (
+          e.hp <= 0
+        ) {
+
+          killEnemy(e);
+        }
+
+
+        if (
+          m.pierce > 0
+        ) {
+
+          m.pierce--;
+
+        } else {
+
+          remove = true;
+
+          break;
+        }
+      }
+    }
+
+
+    if (
+      remove
+    ) {
+
+      missiles.splice(
+        i,
+        1
+      );
+    }
+  }
+}
+
+
+// =====================================================
+// DRAW MISSILES
+// =====================================================
+
+function drawMissiles() {
+
+  for (
+    let m of missiles
+  ) {
+
+    push();
+
+    let angle =
+      atan2(
+        m.target.y - m.y,
+        m.target.x - m.x
+      );
+
+    translate(
+      m.x,
+      m.y
+    );
+
+    rotate(angle);
+
+
+    noStroke();
+
+
+    fill(
+      60,
+      200,
+      255,
+      40
+    );
+
+    ellipse(
+      0,
+      0,
+      32
+    );
+
+
+    fill(
+      80,
+      220,
+      255
+    );
+
+    ellipse(
+      0,
+      0,
+      11
+    );
+
+
+    fill(
+      235,
+      255,
+      255
+    );
+
+    ellipse(
+      3,
+      -2,
+      4
+    );
+
+
+    fill(
+      50,
+      160,
+      255,
+      160
+    );
+
+    triangle(
+      -4,
+      0,
+      -25,
+      -6,
+      -25,
+      6
+    );
+
+
+    pop();
+  }
+}
+
+
+// =====================================================
+// SPECIAL MAGIC
+// =====================================================
+
+function updateSpecialMagic() {
+
+  // LIGHTNING
+
+  if (
+    magic.lightning > 0 &&
+    enemies.length > 0 &&
+    millis() -
+    specialTimer >
+    1300
+  ) {
+
+    specialTimer =
+      millis();
+
+
+    let count =
+      min(
+        magic.lightning,
+        enemies.length
+      );
+
+
+    for (
+      let i = 0;
+      i < count;
+      i++
+    ) {
+
+      let e =
+        random(
+          enemies
+        );
+
+
+      e.hp -=
+        25 +
+        level * 5;
+
+
+      effects.push({
+
+        type:
+          "lightning",
+
+        x:
+          e.x,
+
+        y:
+          e.y,
+
+        life:
+          300
+      });
+
+
+      if (
+        e.hp <= 0
+      ) {
+
+        killEnemy(e);
+      }
+    }
+  }
+
+
+  // METEOR
+
+  if (
+    magic.meteor > 0 &&
+    enemies.length > 0 &&
+    millis() -
+    specialTimer >
+    5000
+  ) {
+
+    specialTimer =
+      millis();
+
+
+    let e =
+      random(
+        enemies
+      );
+
+
+    effects.push({
+
+      type:
+        "meteor",
+
+      x:
+        e.x,
+
+      y:
+        e.y,
+
+      life:
+        900,
+
+      damage:
+        90 *
+        magic.meteor,
+
+      hit: false
+    });
+  }
+
+
+  // TORNADO
+
+  if (
+    magic.tornado > 0
+  ) {
+
+    for (
+      let e of enemies
+    ) {
+
+      if (
+        random() <
+        0.008 *
+        magic.tornado
+      ) {
+
+        e.y -=
+          15 *
+          magic.tornado;
+      }
+    }
+  }
+
+
+  // HOLY
+
+  if (
+    magic.holy > 0
+  ) {
+
+    for (
+      let e of [
+        ...enemies
+      ]
+    ) {
+
+      let d =
+        dist(
+          e.x,
+          e.y,
+          castle.x,
+          castle.y
+        );
+
+
+      if (
+        d < 170 &&
+        random() <
+        0.007 *
+        magic.holy
+      ) {
+
+        e.hp -=
+          6 *
+          magic.holy;
+
+
+        effects.push({
+
+          type:
+            "holy",
+
+          x:
+            e.x,
+
+          y:
+            e.y,
+
+          life:
+            250
+        });
+
+
+        if (
+          e.hp <= 0
+        ) {
+
+          killEnemy(e);
+        }
+      }
+    }
+  }
+}
+
+
+// =====================================================
+// AREA DAMAGE
+// =====================================================
+
+function damageArea(
+  target,
+  amount
+) {
+
+  for (
+    let e of [
+      ...enemies
+    ]
+  ) {
+
+    if (
+      e === target
+    ) {
+      continue;
+    }
+
+
+    let d =
+      dist(
+        target.x,
+        target.y,
+        e.x,
+        e.y
+      );
+
+
+    if (
+      d < 65
+    ) {
+
+      e.hp -=
+        amount;
+
+
+      if (
+        e.hp <= 0
+      ) {
+
+        killEnemy(e);
+      }
+    }
+  }
+}
+
+
+// =====================================================
+// KILL
+// =====================================================
+
+function killEnemy(e) {
+
+  let index =
+    enemies.indexOf(e);
+
+
+  if (
+    index === -1
+  ) {
+    return;
+  }
+
+
+  createExplosion(
+    e.x,
+    e.y,
+    18
+  );
+
+
+  // ★ 倒した瞬間にXP
+
+  xp +=
+    e.xp;
+
+
+  enemies.splice(
+    index,
+    1
+  );
+
+
+  // level up
+
+  if (
+    xp >= xpNeed
+  ) {
+
+    xp -=
+      xpNeed;
+
+    levelUp();
+  }
+}
+
+
+// =====================================================
+// LEVEL UP
+// =====================================================
+
+function levelUp() {
+
+  level++;
+
+
+  // 6 → 9 → 12 → 15 ...
+
+  xpNeed =
+    6 +
+    (level - 1) * 3;
+
+
+  let all = [
+
+    {
+      name:
+        "🔥 ファイア",
+
+      desc:
+        "攻撃力 +25",
+
+      type:
+        "damage"
+    },
+
+    {
+      name:
+        "⚡ サンダー",
+
+      desc:
+        "雷が自動で落ちる",
+
+      type:
+        "lightning"
+    },
+
+    {
+      name:
+        "❄️ アイス",
+
+      desc:
+        "敵を大幅に減速",
+
+      type:
+        "ice"
+    },
+
+    {
+      name:
+        "💥 爆裂",
+
+      desc:
+        "着弾時に周囲へ追加ダメージ",
+
+      type:
+        "explosion"
+    },
+
+    {
+      name:
+        "🟣 貫通",
+
+      desc:
+        "魔法が敵を追加で貫通",
+
+      type:
+        "pierce"
+    },
+
+    {
+      name:
+        "⚡ 高速詠唱",
+
+      desc:
+        "攻撃間隔を短縮",
+
+      type:
+        "cooldown"
+    },
+
+    {
+      name:
+        "☄️ メテオ",
+
+      desc:
+        "巨大な隕石を落とす",
+
+      type:
+        "meteor"
+    },
+
+    {
+      name:
+        "🌪️ 竜巻",
+
+      desc:
+        "敵を上方向へ押し戻す",
+
+      type:
+        "tornado"
+    },
+
+    {
+      name:
+        "✨ 聖光",
+
+      desc:
+        "城の近くの敵を攻撃",
+
+      type:
+        "holy"
+    },
+
+    {
+      name:
+        "❤️ 城再生",
+
+      desc:
+        "城HPが徐々に回復",
+
+      type:
+        "heal"
+    },
+
+    {
+      name:
+        "🔮 多重魔弾",
+
+      desc:
+        "同時に撃つ魔法 +1",
+
+      type:
+        "count"
+    }
+  ];
+
+
+  shuffle(
+    all,
+    true
+  );
+
+
+  upgrades =
+    all.slice(
+      0,
+      3
+    );
+
+
+  gameState =
+    "levelup";
+}
+
+
+// =====================================================
+// LEVEL UP SCREEN
+// =====================================================
+
+function drawLevelUp() {
+
+  fill(
+    3,
+    7,
+    20,
+    245
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+
+  fill(
+    255,
+    220,
+    70
+  );
+
+  textSize(34);
+
+  text(
+    "LEVEL UP",
+    width / 2,
+    height * 0.14
+  );
+
+
+  fill(
+    180,
+    205,
+    235
+  );
+
+  textSize(14);
+
+  text(
+    "魔法を1つ選択",
+    width / 2,
+    height * 0.20
+  );
+
+
+  let cardX = 18;
+
+  let cardW =
+    width - 36;
+
+  let cardH = 88;
+
+
+  for (
+    let i = 0;
+    i < upgrades.length;
+    i++
+  ) {
+
+    let y =
+      height * 0.27 +
+      i * 108;
+
+
+    fill(
+      18,
+      34,
+      67
+    );
+
+    stroke(
+      70,
+      150,
+      255
+    );
+
+    strokeWeight(2);
+
+
+    rect(
+      cardX,
+      y,
+      cardW,
+      cardH,
+      14
+    );
+
+
+    noStroke();
+
+
+    fill(255);
+
+    textSize(19);
+
+    text(
+      upgrades[i].name,
+      width / 2,
+      y + 27
+    );
+
+
+    fill(
+      160,
+      190,
+      225
+    );
+
+    textSize(12);
+
+    text(
+      upgrades[i].desc,
+      width / 2,
+      y + 59
+    );
+  }
+}
+
+
+// =====================================================
+// INPUT
+// =====================================================
+
+function mousePressed() {
+
+  if (
+    gameState !==
+    "levelup"
+  ) {
+
+    if (
+      gameState ===
+      "gameover"
+    ) {
+
+      restart();
+    }
+
+    return;
+  }
+
+
+  let cardX = 18;
+
+  let cardW =
+    width - 36;
+
+  let cardH = 88;
+
+
+  for (
+    let i = 0;
+    i < upgrades.length;
+    i++
+  ) {
+
+    let y =
+      height * 0.27 +
+      i * 108;
+
+
+    if (
+      mouseX >= cardX &&
+      mouseX <=
+      cardX + cardW &&
+      mouseY >= y &&
+      mouseY <=
+      y + cardH
+    ) {
+
+      applyUpgrade(
+        upgrades[i]
+      );
+
+      gameState =
+        "play";
+
+      spellTimer =
+        millis();
+
+      break;
+    }
+  }
+}
+
+
+// =====================================================
+// UPGRADE
+// =====================================================
+
+function applyUpgrade(u) {
+
+  if (
+    u.type ===
+    "damage"
+  ) {
+
+    magic.damage +=
+      25;
+  }
+
+
+  if (
+    u.type ===
+    "lightning"
+  ) {
+
+    magic.lightning++;
+  }
+
+
+  if (
+    u.type ===
+    "ice"
+  ) {
+
+    magic.ice++;
+  }
+
+
+  if (
+    u.type ===
+    "explosion"
+  ) {
+
+    magic.explosion +=
+      20;
+  }
+
+
+  if (
+    u.type ===
+    "pierce"
+  ) {
+
+    magic.pierce++;
+  }
+
+
+  if (
+    u.type ===
+    "cooldown"
+  ) {
+
+    magic.cooldown =
+      max(
+        650,
+        magic.cooldown - 220
+      );
+  }
+
+
+  if (
+    u.type ===
+    "meteor"
+  ) {
+
+    magic.meteor++;
+  }
+
+
+  if (
+    u.type ===
+    "tornado"
+  ) {
+
+    magic.tornado++;
+  }
+
+
+  if (
+    u.type ===
+    "holy"
+  ) {
+
+    magic.holy++;
+  }
+
+
+  if (
+    u.type ===
+    "heal"
+  ) {
+
+    magic.heal++;
+  }
+
+
+  if (
+    u.type ===
+    "count"
+  ) {
+
+    magic.missileCount++;
+  }
+}
+
+
+// =====================================================
+// EFFECTS
+// =====================================================
+
+function updateEffects() {
+
+  for (
+    let i =
+      effects.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let e =
+      effects[i];
+
+
+    // meteor impact
+
+    if (
+      e.type ===
+      "meteor" &&
+      e.life < 400 &&
+      !e.hit
+    ) {
+
+      e.hit = true;
+
+
+      for (
+        let enemy of [
+          ...enemies
+        ]
+      ) {
+
+        if (
+          dist(
+            e.x,
+            e.y,
+            enemy.x,
+            enemy.y
+          ) < 80
+        ) {
+
+          enemy.hp -=
+            e.damage;
+
+
+          if (
+            enemy.hp <= 0
+          ) {
+
+            killEnemy(
+              enemy
+            );
+          }
+        }
+      }
+
+
+      createExplosion(
+        e.x,
+        e.y,
+        30
+      );
+    }
+
+
+    e.life -=
+      deltaTime;
+
+
+    if (
+      e.life <= 0
+    ) {
+
+      effects.splice(
+        i,
+        1
+      );
+    }
+  }
+}
+
+
+// =====================================================
+// DRAW EFFECTS
+// =====================================================
+
+function drawEffects() {
+
+  for (
+    let e of effects
+  ) {
+
+
+    if (
+      e.type ===
+      "lightning"
+    ) {
+
+      stroke(
+        100,
+        220,
+        255,
+        230
+      );
+
+      strokeWeight(4);
+
+      line(
+        e.x,
+        e.y - 230,
+        e.x,
+        e.y
+      );
+
+      noStroke();
+    }
+
+
+    if (
+      e.type ===
+      "meteor"
+    ) {
+
+      let alpha =
+        map(
+          e.life,
+          0,
+          900,
+          0,
+          210
+        );
+
+
+      fill(
+        255,
+        80,
+        20,
+        alpha
+      );
+
+      ellipse(
+        e.x,
+        e.y,
+        90
+      );
+
+
+      fill(
+        255,
+        220,
+        70,
+        alpha
+      );
+
+      ellipse(
+        e.x,
+        e.y,
+        40
+      );
+    }
+
+
+    if (
+      e.type ===
+      "holy"
+    ) {
+
+      noFill();
+
+      stroke(
+        255,
+        240,
+        100,
+        210
+      );
+
+      strokeWeight(4);
+
+      ellipse(
+        e.x,
+        e.y,
+        45
+      );
+
+      noStroke();
+    }
+  }
+}
+
+
+// =====================================================
+// PARTICLES
+// =====================================================
+
+function createExplosion(
+  x,
+  y,
+  amount
+) {
+
+  for (
+    let i = 0;
+    i < amount;
+    i++
+  ) {
+
+    let angle =
+      random(TWO_PI);
+
+    let speed =
+      random(
+        1,
+        4
+      );
+
+
+    particles.push({
+
+      x: x,
+
+      y: y,
+
+      vx:
+        cos(angle) *
+        speed,
+
+      vy:
+        sin(angle) *
+        speed,
+
+      life:
+        random(
+          250,
+          550
+        ),
+
+      size:
+        random(
+          3,
+          7
+        )
+    });
+  }
+}
+
+
+function updateParticles() {
+
+  for (
+    let i =
+      particles.length - 1;
+    i >= 0;
+    i--
+  ) {
+
+    let p =
+      particles[i];
+
+
+    p.x +=
+      p.vx;
+
+    p.y +=
+      p.vy;
+
+
+    p.vx *=
+      0.97;
+
+    p.vy *=
+      0.97;
+
+
+    p.life -=
+      deltaTime;
+
+
+    if (
+      p.life <= 0
+    ) {
+
+      particles.splice(
+        i,
+        1
+      );
+    }
+  }
+}
+
+
+function drawParticles() {
+
+  noStroke();
+
+
+  for (
+    let p of particles
+  ) {
+
+    let alpha =
+      map(
+        p.life,
+        0,
+        550,
+        0,
+        220
+      );
+
+
+    fill(
+      80,
+      210,
+      255,
+      alpha
+    );
+
+
+    ellipse(
+      p.x,
+      p.y,
+      p.size
+    );
+  }
+}
+
+
+// =====================================================
+// UI
+// =====================================================
+
+function drawUI() {
+
+  textAlign(
+    LEFT,
+    TOP
+  );
+
+
+  // LEVEL
+
+  fill(255);
+
+  textSize(21);
+
+  text(
+    "Lv." +
+    level,
+    14,
+    12
+  );
+
+
+  // MAGIC
+
+  fill(
+    170,
+    195,
+    225
+  );
+
+  textSize(11);
+
+  text(
+    "DMG " +
+    magic.damage,
+    14,
+    40
+  );
+
+
+  text(
+    "SPELL ×" +
+    magic.missileCount,
+    14,
+    56
+  );
+
+
+  // XP BAR
+
+  fill(
+    20,
+    30,
+    55
+  );
+
+  rect(
+    14,
+    height - 27,
+    width - 28,
+    9,
+    5
+  );
+
+
+  fill(
+    70,
+    190,
+    255
+  );
+
+  rect(
+    14,
+    height - 27,
+
+    (width - 28) *
+    xp /
+    xpNeed,
+
+    9,
+
+    5
+  );
+
+
+  fill(
+    175,
+    200,
+    230
+  );
+
+  textAlign(
+    CENTER,
+    BOTTOM
+  );
+
+  textSize(11);
+
+  text(
+    "EXP " +
+    xp +
+    " / " +
+    xpNeed,
+
+    width / 2,
+    height - 32
+  );
+}
+
+
+// =====================================================
+// GAME OVER
+// =====================================================
+
+function drawGameOver() {
+
+  fill(
+    0,
+    0,
+    10,
+    230
+  );
+
+  rect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  textAlign(
+    CENTER,
+    CENTER
+  );
+
+
+  fill(
+    255,
+    70,
+    90
+  );
+
+  textSize(32);
+
+  text(
+    "CASTLE FALLEN",
+    width / 2,
+    height * 0.42
+  );
+
+
+  fill(240);
+
+  textSize(18);
+
+  text(
+    "LEVEL " +
+    level,
+    width / 2,
+    height * 0.50
+  );
+
+
+  fill(
+    165,
+    190,
+    220
+  );
+
+  textSize(14);
+
+  text(
+    "タップで再挑戦",
+    width / 2,
+    height * 0.58
+  );
+}
+
+
+// =====================================================
+// RESTART
+// =====================================================
+
+function restart() {
+
+  enemies = [];
+
+  missiles = [];
+
+  particles = [];
+
+  effects = [];
+
+
+  level = 1;
+
+  xp = 0;
+
+  xpNeed = 6;
+
+
+  castle.hp =
+    castle.maxHp;
+
+
+  magic = {
+
+    damage: 45,
+
+    cooldown: 2000,
+
+    missileSpeed: 7,
+
+    missileCount: 1,
+
+    pierce: 0,
+
+    explosion: 0,
+
+    lightning: 0,
+
+    ice: 0,
+
+    meteor: 0,
+
+    tornado: 0,
+
+    holy: 0,
+
+    heal: 0
+  };
+
+
+  spawnTimer = 0;
+
+  spellTimer =
+    millis();
+
+  specialTimer =
+    millis();
+
+
+  gameState =
+    "play";
+}
+
+
+// =====================================================
+// RESIZE
+// =====================================================
+
+function windowResized() {
+
+  resizeCanvas(
+    min(
+      windowWidth,
+      480
+    ),
+    windowHeight
+  );
+
+
+  castle.x =
+    width / 2;
+
+  castle.y =
+    height - 75;
+}
+</script>
 </body>
 </html>
