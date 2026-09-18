@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>p5.js ゲーム作品</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    .header-group {
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin: 10px 0 5px 0;
+    }
+    p {
+      color: #aaa;
+      margin: 0;
+    }
+    .back-link {
+      display: inline-block;
+      color: #4fc3f7;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    /* ゲーム画面エリア（中央寄せ） */
+    #game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      margin: 10px auto 40px auto;
+      min-height: 100px;
+    }
+    #game-container canvas {
+      display: block !important;
+      margin: 0 auto !important;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 4px;
+    }
+    /* ソースコード枠（ゲーム画面の下） */
+    .code-container {
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      text-align: left;
+      background: #272822;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #1e1e1e;
+      margin: 0;
+      padding: 8px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-header span {
+      font-size: 0.85rem;
+      color: #888;
+      font-weight: bold;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .copy-btn:hover {
+      background: #333;
+      border-color: #666;
+      color: #fff;
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    pre {
+      margin: 0 !important;
+      padding: 15px !important;
+      font-size: 0.85rem;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- 1. ヘッダー情報 -->
+  <div class="header-group">
+    <a href="index.html" class="back-link">← 一覧に戻る</a>
+    <h1>作者: 迷路</h1>
+    <p></p>
+  </div>
+
+  <!-- 2. ゲーム画面コンテナ（必ずコード枠の上） -->
+  <div id="game-container"></div>
+
+  <!-- 3. ソースコード枠（必ずゲーム画面の下） -->
+  <div class="code-container">
+    <div class="code-header">
+      <span>ソースコード</span>
+      <button class="copy-btn" id="copy-btn" title="コードをコピー" aria-label="コードをコピー">
+        <svg id="copy-icon" viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+    </div>
+    <pre><code id="source-code" class="language-javascript">// ============================================================
+// 3D FPS MAZE (Improved Version - Spawn Facing Corridor)
+// p5.js
+// ============================================================
+
+// ============================================================
+// MAZE DEFINITION
+// P: Player Start, G: Goal, #: Wall, &#039; &#039;: Road
+// ============================================================
+const maze = [
+  &quot;###############&quot;,
+  &quot;#P            #&quot;,
+  &quot;# ##### ##### #&quot;,
+  &quot;#     #       #&quot;,
+  &quot;##### # #######&quot;,
+  &quot;#     #       #&quot;,
+  &quot;# ### ##### # #&quot;,
+  &quot;# #         # #&quot;,
+  &quot;# # ####### # #&quot;,
+  &quot;# #       #  G#&quot;,
+  &quot;# ####### #####&quot;,
+  &quot;#             #&quot;,
+  &quot;###############&quot;
+];
+
+// ============================================================
+// SETTINGS
+// ============================================================
+const CELL_SIZE = 80;
+const WALL_HEIGHT = 120;
+const PLAYER_HEIGHT = 45;
+
+// カメラめり込み防止用半径
+const PLAYER_RADIUS = 25;
+
+const MOVE_SPEED = 240; // ピクセル/秒 (deltaTime用)
+const MOUSE_SENSITIVITY = 0.0025;
+
+// ============================================================
+// STATE
+// ============================================================
+let playerX = 0;
+let playerZ = 0;
+// 初期の視界を通路方向（東向き）へ向けるため HALF_PI に設定
+let playerYaw = 0;    // initMaze 時に設定
+let playerPitch = 0;  // 垂直視点
+
+let mazeRows = 0;
+let mazeCols = 0;
+let offsetX = 0;
+let offsetZ = 0;
+
+let goalPos = null;
+let isCleared = false;
+let startTime = 0;
+let clearTime = 0;
+
+let walls = [];
+let keys = { w: false, a: false, s: false, d: false };
+
+// ============================================================
+// SETUP
+// ============================================================
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  noStroke();
+
+  updatePerspective();
+  initMaze();
+  startTime = millis();
+
+  window.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  window.addEventListener(&quot;keyup&quot;, handleKeyUp);
+  window.addEventListener(&quot;blur&quot;, releaseAllKeys);
+}
+
+function updatePerspective() {
+  const fov = PI / 3;
+  const cameraZ = (height / 2.0) / tan(fov / 2.0);
+  perspective(fov, width / height, 1, cameraZ * 10);
+}
+
+// ============================================================
+// INITIALIZE MAZE
+// ============================================================
+function initMaze() {
+  mazeRows = maze.length;
+  mazeCols = maze[0].length;
+  offsetX = (mazeCols * CELL_SIZE) / 2;
+  offsetZ = (mazeRows * CELL_SIZE) / 2;
+
+  walls = [];
+
+  for (let r = 0; r &lt; mazeRows; r++) {
+    for (let c = 0; c &lt; mazeCols; c++) {
+      const tile = maze[r][c];
+      const worldX = c * CELL_SIZE - offsetX + CELL_SIZE / 2;
+      const worldZ = r * CELL_SIZE - offsetZ + CELL_SIZE / 2;
+
+      if (tile === &quot;#&quot;) {
+        walls.push({ x: worldX, z: worldZ });
+      } else if (tile === &quot;P&quot;) {
+        playerX = worldX;
+        playerZ = worldZ;
+        // 初期視界を通路が開いている方向（東＝右向き）へ向ける
+        playerYaw = HALF_PI;
+      } else if (tile === &quot;G&quot;) {
+        goalPos = { x: worldX, z: worldZ };
+      }
+    }
+  }
+}
+
+// ============================================================
+// INPUT EVENTS
+// ============================================================
+function handleKeyDown(event) {
+  if (event.code === &quot;KeyW&quot;) keys.w = true;
+  if (event.code === &quot;KeyA&quot;) keys.a = true;
+  if (event.code === &quot;KeyS&quot;) keys.s = true;
+  if (event.code === &quot;KeyD&quot;) keys.d = true;
+}
+
+function handleKeyUp(event) {
+  if (event.code === &quot;KeyW&quot;) keys.w = false;
+  if (event.code === &quot;KeyA&quot;) keys.a = false;
+  if (event.code === &quot;KeyS&quot;) keys.s = false;
+  if (event.code === &quot;KeyD&quot;) keys.d = false;
+}
+
+function releaseAllKeys() {
+  keys.w = false;
+  keys.a = false;
+  keys.s = false;
+  keys.d = false;
+}
+
+function mousePressed() {
+  if (!document.pointerLockElement) {
+    requestPointerLock();
+  }
+}
+
+function mouseMoved() {
+  if (document.pointerLockElement) {
+    playerYaw += movedX * MOUSE_SENSITIVITY;
+    playerPitch -= movedY * MOUSE_SENSITIVITY;
+    playerPitch = constrain(playerPitch, -HALF_PI + 0.01, HALF_PI - 0.01);
+  }
+}
+
+document.addEventListener(&quot;pointerlockchange&quot;, function () {
+  if (!document.pointerLockElement) {
+    releaseAllKeys();
+  }
+});
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  updatePerspective();
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+function draw() {
+  background(20, 24, 30);
+
+  const dt = min(deltaTime / 1000, 0.1);
+
+  if (!isCleared) {
+    updatePlayer(dt);
+    checkGoal();
+  }
+
+  updateCamera();
+
+  ambientLight(120);
+  directionalLight(255, 255, 255, -0.5, -1, -0.5);
+
+  drawFloor();
+  drawWalls();
+  drawGoal();
+}
+
+// ============================================================
+// PHYSICS &amp; PLAYER
+// ============================================================
+function updatePlayer(dt) {
+  let forward = 0;
+  let strafe = 0;
+
+  if (keys.w) forward += 1;
+  if (keys.s) forward -= 1;
+  if (keys.a) strafe -= 1;
+  if (keys.d) strafe += 1;
+
+  if (forward === 0 &amp;&amp; strafe === 0) return;
+
+  let dx = sin(playerYaw) * forward + cos(playerYaw) * strafe;
+  let dz = -cos(playerYaw) * forward + sin(playerYaw) * strafe;
+
+  const len = sqrt(dx * dx + dz * dz);
+  if (len === 0) return;
+
+  dx = (dx / len) * MOVE_SPEED * dt;
+  dz = (dz / len) * MOVE_SPEED * dt;
+
+  const nextX = playerX + dx;
+  if (!checkGridCollision(nextX, playerZ)) {
+    playerX = nextX;
+  }
+
+  const nextZ = playerZ + dz;
+  if (!checkGridCollision(playerX, nextZ)) {
+    playerZ = nextZ;
+  }
+}
+
+function checkGridCollision(targetX, targetZ) {
+  const centerCol = floor((targetX + offsetX) / CELL_SIZE);
+  const centerRow = floor((targetZ + offsetZ) / CELL_SIZE);
+
+  for (let r = centerRow - 1; r &lt;= centerRow + 1; r++) {
+    for (let c = centerCol - 1; c &lt;= centerCol + 1; c++) {
+      if (r &lt; 0 || r &gt;= mazeRows || c &lt; 0 || c &gt;= mazeCols) continue;
+
+      if (maze[r][c] === &quot;#&quot;) {
+        const wallX = c * CELL_SIZE - offsetX + CELL_SIZE / 2;
+        const wallZ = r * CELL_SIZE - offsetZ + CELL_SIZE / 2;
+
+        const closestX = constrain(targetX, wallX - CELL_SIZE / 2, wallX + CELL_SIZE / 2);
+        const closestZ = constrain(targetZ, wallZ - CELL_SIZE / 2, wallZ + CELL_SIZE / 2);
+
+        if (dist(targetX, targetZ, closestX, closestZ) &lt; PLAYER_RADIUS) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function checkGoal() {
+  if (!goalPos) return;
+  if (dist(playerX, playerZ, goalPos.x, goalPos.z) &lt; CELL_SIZE * 0.4) {
+    isCleared = true;
+    clearTime = ((millis() - startTime) / 1000).toFixed(2);
+    if (document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+  }
+}
+
+// ============================================================
+// CAMERA
+// ============================================================
+function updateCamera() {
+  const lookDist = 100;
+  const lookX = playerX + sin(playerYaw) * cos(playerPitch) * lookDist;
+  const lookY = -PLAYER_HEIGHT + sin(playerPitch) * lookDist;
+  const lookZ = playerZ - cos(playerYaw) * cos(playerPitch) * lookDist;
+
+  camera(
+    playerX, -PLAYER_HEIGHT, playerZ,
+    lookX, lookY, lookZ,
+    0, 1, 0
+  );
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function drawFloor() {
+  push();
+  translate(0, 0, 0);
+  rotateX(HALF_PI);
+  ambientMaterial(40, 45, 50);
+  plane(mazeCols * CELL_SIZE * 2, mazeRows * CELL_SIZE * 2);
+  pop();
+}
+
+function drawWalls() {
+  for (const wall of walls) {
+    push();
+    translate(wall.x, -WALL_HEIGHT / 2, wall.z);
+    ambientMaterial(110, 120, 135);
+    box(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+    pop();
+  }
+}
+
+function drawGoal() {
+  if (!goalPos) return;
+
+  push();
+  const floatY = -PLAYER_HEIGHT + sin(millis() * 0.005) * 8;
+  translate(goalPos.x, floatY, goalPos.z);
+  rotateY(millis() * 0.002);
+  ambientMaterial(255, 215, 0);
+  emissiveMaterial(80, 70, 0);
+  box(24);
+  pop();
+}</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+  <script>
+    // コピーボタン処理
+    const copyBtn = document.getElementById("copy-btn");
+    const copyIcon = document.getElementById("copy-icon");
+    const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+    const checkSvg = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+
+    copyBtn.addEventListener("click", function() {
+      const codeText = document.getElementById("source-code").textContent;
+      navigator.clipboard.writeText(codeText).then(function() {
+        copyIcon.innerHTML = checkSvg;
+        copyBtn.style.color = "#4fc3f7";
+        setTimeout(function() {
+          copyIcon.innerHTML = originalSvg;
+          copyBtn.style.color = "";
+        }, 2000);
+      });
+    });
+
+    // キャンバス生成位置を #game-container の中に強制移動する
+    function relocateCanvas() {
+      const container = document.getElementById("game-container");
+      const canvases = document.querySelectorAll("canvas");
+      canvases.forEach(cvs => {
+        if (cvs.parentElement !== container) {
+          container.appendChild(cvs);
+        }
+      });
+    }
+
+    // DOM変更を常時監視して、キャンバスがbody直下に作られた瞬間に即移動
+    const observer = new MutationObserver(relocateCanvas);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("DOMContentLoaded", relocateCanvas);
+    window.addEventListener("load", relocateCanvas);
+  </script>
+
+  <!-- 4. 生徒のスクリプト実行 -->
+  <script>
+    // 生徒が定義する setup の完了時にも即座にキャンバス格納を実行するフック
+    window.addEventListener('load', () => {
+      if (typeof window.setup === 'function') {
+        const originalSetup = window.setup;
+        window.setup = function() {
+          originalSetup.apply(this, arguments);
+          relocateCanvas();
+        };
+      }
+    });
+  </script>
+  <script>// ============================================================
+// 3D FPS MAZE (Improved Version - Spawn Facing Corridor)
+// p5.js
+// ============================================================
+
+// ============================================================
+// MAZE DEFINITION
+// P: Player Start, G: Goal, #: Wall, ' ': Road
+// ============================================================
+const maze = [
+  "###############",
+  "#P            #",
+  "# ##### ##### #",
+  "#     #       #",
+  "##### # #######",
+  "#     #       #",
+  "# ### ##### # #",
+  "# #         # #",
+  "# # ####### # #",
+  "# #       #  G#",
+  "# ####### #####",
+  "#             #",
+  "###############"
+];
+
+// ============================================================
+// SETTINGS
+// ============================================================
+const CELL_SIZE = 80;
+const WALL_HEIGHT = 120;
+const PLAYER_HEIGHT = 45;
+
+// カメラめり込み防止用半径
+const PLAYER_RADIUS = 25;
+
+const MOVE_SPEED = 240; // ピクセル/秒 (deltaTime用)
+const MOUSE_SENSITIVITY = 0.0025;
+
+// ============================================================
+// STATE
+// ============================================================
+let playerX = 0;
+let playerZ = 0;
+// 初期の視界を通路方向（東向き）へ向けるため HALF_PI に設定
+let playerYaw = 0;    // initMaze 時に設定
+let playerPitch = 0;  // 垂直視点
+
+let mazeRows = 0;
+let mazeCols = 0;
+let offsetX = 0;
+let offsetZ = 0;
+
+let goalPos = null;
+let isCleared = false;
+let startTime = 0;
+let clearTime = 0;
+
+let walls = [];
+let keys = { w: false, a: false, s: false, d: false };
+
+// ============================================================
+// SETUP
+// ============================================================
+function setup() {
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  noStroke();
+
+  updatePerspective();
+  initMaze();
+  startTime = millis();
+
+  window.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("keyup", handleKeyUp);
+  window.addEventListener("blur", releaseAllKeys);
+}
+
+function updatePerspective() {
+  const fov = PI / 3;
+  const cameraZ = (height / 2.0) / tan(fov / 2.0);
+  perspective(fov, width / height, 1, cameraZ * 10);
+}
+
+// ============================================================
+// INITIALIZE MAZE
+// ============================================================
+function initMaze() {
+  mazeRows = maze.length;
+  mazeCols = maze[0].length;
+  offsetX = (mazeCols * CELL_SIZE) / 2;
+  offsetZ = (mazeRows * CELL_SIZE) / 2;
+
+  walls = [];
+
+  for (let r = 0; r < mazeRows; r++) {
+    for (let c = 0; c < mazeCols; c++) {
+      const tile = maze[r][c];
+      const worldX = c * CELL_SIZE - offsetX + CELL_SIZE / 2;
+      const worldZ = r * CELL_SIZE - offsetZ + CELL_SIZE / 2;
+
+      if (tile === "#") {
+        walls.push({ x: worldX, z: worldZ });
+      } else if (tile === "P") {
+        playerX = worldX;
+        playerZ = worldZ;
+        // 初期視界を通路が開いている方向（東＝右向き）へ向ける
+        playerYaw = HALF_PI;
+      } else if (tile === "G") {
+        goalPos = { x: worldX, z: worldZ };
+      }
+    }
+  }
+}
+
+// ============================================================
+// INPUT EVENTS
+// ============================================================
+function handleKeyDown(event) {
+  if (event.code === "KeyW") keys.w = true;
+  if (event.code === "KeyA") keys.a = true;
+  if (event.code === "KeyS") keys.s = true;
+  if (event.code === "KeyD") keys.d = true;
+}
+
+function handleKeyUp(event) {
+  if (event.code === "KeyW") keys.w = false;
+  if (event.code === "KeyA") keys.a = false;
+  if (event.code === "KeyS") keys.s = false;
+  if (event.code === "KeyD") keys.d = false;
+}
+
+function releaseAllKeys() {
+  keys.w = false;
+  keys.a = false;
+  keys.s = false;
+  keys.d = false;
+}
+
+function mousePressed() {
+  if (!document.pointerLockElement) {
+    requestPointerLock();
+  }
+}
+
+function mouseMoved() {
+  if (document.pointerLockElement) {
+    playerYaw += movedX * MOUSE_SENSITIVITY;
+    playerPitch -= movedY * MOUSE_SENSITIVITY;
+    playerPitch = constrain(playerPitch, -HALF_PI + 0.01, HALF_PI - 0.01);
+  }
+}
+
+document.addEventListener("pointerlockchange", function () {
+  if (!document.pointerLockElement) {
+    releaseAllKeys();
+  }
+});
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  updatePerspective();
+}
+
+// ============================================================
+// MAIN LOOP
+// ============================================================
+function draw() {
+  background(20, 24, 30);
+
+  const dt = min(deltaTime / 1000, 0.1);
+
+  if (!isCleared) {
+    updatePlayer(dt);
+    checkGoal();
+  }
+
+  updateCamera();
+
+  ambientLight(120);
+  directionalLight(255, 255, 255, -0.5, -1, -0.5);
+
+  drawFloor();
+  drawWalls();
+  drawGoal();
+}
+
+// ============================================================
+// PHYSICS & PLAYER
+// ============================================================
+function updatePlayer(dt) {
+  let forward = 0;
+  let strafe = 0;
+
+  if (keys.w) forward += 1;
+  if (keys.s) forward -= 1;
+  if (keys.a) strafe -= 1;
+  if (keys.d) strafe += 1;
+
+  if (forward === 0 && strafe === 0) return;
+
+  let dx = sin(playerYaw) * forward + cos(playerYaw) * strafe;
+  let dz = -cos(playerYaw) * forward + sin(playerYaw) * strafe;
+
+  const len = sqrt(dx * dx + dz * dz);
+  if (len === 0) return;
+
+  dx = (dx / len) * MOVE_SPEED * dt;
+  dz = (dz / len) * MOVE_SPEED * dt;
+
+  const nextX = playerX + dx;
+  if (!checkGridCollision(nextX, playerZ)) {
+    playerX = nextX;
+  }
+
+  const nextZ = playerZ + dz;
+  if (!checkGridCollision(playerX, nextZ)) {
+    playerZ = nextZ;
+  }
+}
+
+function checkGridCollision(targetX, targetZ) {
+  const centerCol = floor((targetX + offsetX) / CELL_SIZE);
+  const centerRow = floor((targetZ + offsetZ) / CELL_SIZE);
+
+  for (let r = centerRow - 1; r <= centerRow + 1; r++) {
+    for (let c = centerCol - 1; c <= centerCol + 1; c++) {
+      if (r < 0 || r >= mazeRows || c < 0 || c >= mazeCols) continue;
+
+      if (maze[r][c] === "#") {
+        const wallX = c * CELL_SIZE - offsetX + CELL_SIZE / 2;
+        const wallZ = r * CELL_SIZE - offsetZ + CELL_SIZE / 2;
+
+        const closestX = constrain(targetX, wallX - CELL_SIZE / 2, wallX + CELL_SIZE / 2);
+        const closestZ = constrain(targetZ, wallZ - CELL_SIZE / 2, wallZ + CELL_SIZE / 2);
+
+        if (dist(targetX, targetZ, closestX, closestZ) < PLAYER_RADIUS) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function checkGoal() {
+  if (!goalPos) return;
+  if (dist(playerX, playerZ, goalPos.x, goalPos.z) < CELL_SIZE * 0.4) {
+    isCleared = true;
+    clearTime = ((millis() - startTime) / 1000).toFixed(2);
+    if (document.exitPointerLock) {
+      document.exitPointerLock();
+    }
+  }
+}
+
+// ============================================================
+// CAMERA
+// ============================================================
+function updateCamera() {
+  const lookDist = 100;
+  const lookX = playerX + sin(playerYaw) * cos(playerPitch) * lookDist;
+  const lookY = -PLAYER_HEIGHT + sin(playerPitch) * lookDist;
+  const lookZ = playerZ - cos(playerYaw) * cos(playerPitch) * lookDist;
+
+  camera(
+    playerX, -PLAYER_HEIGHT, playerZ,
+    lookX, lookY, lookZ,
+    0, 1, 0
+  );
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function drawFloor() {
+  push();
+  translate(0, 0, 0);
+  rotateX(HALF_PI);
+  ambientMaterial(40, 45, 50);
+  plane(mazeCols * CELL_SIZE * 2, mazeRows * CELL_SIZE * 2);
+  pop();
+}
+
+function drawWalls() {
+  for (const wall of walls) {
+    push();
+    translate(wall.x, -WALL_HEIGHT / 2, wall.z);
+    ambientMaterial(110, 120, 135);
+    box(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
+    pop();
+  }
+}
+
+function drawGoal() {
+  if (!goalPos) return;
+
+  push();
+  const floatY = -PLAYER_HEIGHT + sin(millis() * 0.005) * 8;
+  translate(goalPos.x, floatY, goalPos.z);
+  rotateY(millis() * 0.002);
+  ambientMaterial(255, 215, 0);
+  emissiveMaterial(80, 70, 0);
+  box(24);
+  pop();
+}</script>
+</body>
+</html>
