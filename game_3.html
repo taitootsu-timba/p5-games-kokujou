@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>高橋龍司さんのゲーム</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <style>
+    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
+    h1 { font-size: 1.2rem; margin-bottom: 5px; }
+    p { color: #aaa; margin-bottom: 20px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <a href="index.html" class="back-link">← 回覧板に戻る</a>
+  <h1>高橋龍司 (2年 番号:6)</h1>
+  <p>ターン性の格闘ゲーム</p>
+  <script>// プレイヤーの定義
+let p1, p2;
+let gameState = "HUSTLE"; // "HUSTLE" (選択中), "ACTION" (実行中), "GAMEOVER" (決着)
+let actionTimer = 0;
+let maxActionTime = 60; // 1ターンの実行フレーム数
+
+// UIボタン
+let buttons = [];
+
+// ヒットエフェクト用配列
+let particles = [];
+
+// 勝敗判定用のテキスト
+let winMessage = "";
+
+function setup() {
+  createCanvas(800, 500);
+  
+  // プレイヤー初期化 (x, y, 色, 向き)
+  p1 = new Character(300, 350, color(0, 150, 255), 1); 
+  p2 = new Character(500, 350, color(255, 50, 50), -1);
+  
+  // UIボタンの作成
+  let btnWidth = 80;
+  let btnHeight = 40;
+  buttons.push(new Button(20, 430, btnWidth, btnHeight, "MOVE", () => p1.setNextAction("MOVE")));
+  buttons.push(new Button(105, 430, btnWidth, btnHeight, "DASH", () => p1.setNextAction("DASH")));
+  buttons.push(new Button(190, 430, btnWidth, btnHeight, "JUMP", () => p1.setNextAction("JUMP")));
+  buttons.push(new Button(275, 430, btnWidth, btnHeight, "AIR DASH", () => p1.setNextAction("AIR_DASH")));
+  buttons.push(new Button(360, 430, btnWidth, btnHeight, "ATTACK", () => p1.setNextAction("ATTACK")));
+  buttons.push(new Button(445, 430, btnWidth, btnHeight, "UPPER", () => p1.setNextAction("UPPER")));
+  
+  buttons.push(new Button(560, 430, 120, btnHeight, "READY / GO", () => {
+    if (gameState === "HUSTLE") {
+      // P2はランダム行動（地上ならDASHも選択肢に入れる）
+      let p2Acts = ["MOVE", "ATTACK", "UPPER"];
+      if (p2.y < 350) {
+        p2Acts.push("AIR_DASH");
+      } else {
+        p2Acts.push("JUMP");
+        p2Acts.push("DASH");
+      }
+      p2.setNextAction(random(p2Acts));
+      
+      gameState = "ACTION";
+      actionTimer = maxActionTime;
+    }
+  }));
+}
+
+function draw() {
+  background(220);
+  
+  // 地面の描画
+  stroke(100);
+  strokeWeight(2);
+  line(0, 350, width, 350);
+  
+  // HUSTLEフェーズ（選択中・停止中）
+  if (gameState === "HUSTLE") {
+    // ターン開始時なので、攻撃ロックに関係なくお互いの方を絶対に向く
+    p1.forceLookAt(p2);
+    p2.forceLookAt(p1);
+    
+    p1.drawPreview();
+  }
+  
+  // ACTIONフェーズ（リアルタイム処理）
+  if (gameState === "ACTION") {
+    // アクション中は攻撃モーションによる向きロックのルールを適用
+    p1.lookAt(p2);
+    p2.lookAt(p1);
+    
+    p1.update();
+    p2.update();
+    
+    checkCollision(p1, p2);
+    checkCollision(p2, p1);
+    
+    checkGameOver();
+    
+    actionTimer--;
+    if (actionTimer <= 0 && gameState === "ACTION") {
+      gameState = "HUSTLE";
+      p1.resetAction(); // 前のターンのフラグを完全にリセット
+      p2.resetAction();
+    }
+  }
+  
+  // ヒットエフェクト（パーティクル）の更新と描画
+  for (let i = particles.length - 1; i >= 0; i--) {
+    particles[i].update();
+    particles[i].display();
+    if (particles[i].isDead()) {
+      particles.splice(i, 1);
+    }
+  }
+  
+  // キャラクターの描画
+  p1.display();
+  p2.display();
+  
+  drawUI();
+  
+  // ゲームオーバー画面
+  if (gameState === "GAMEOVER") {
+    fill(0, 180);
+    noStroke();
+    rect(0, 0, width, height);
+    
+    fill(255, 50, 50);
+    textSize(48);
+    textAlign(CENTER, CENTER);
+    text("GAME OVER", width / 2, height / 2 - 30);
+    
+    fill(255);
+    textSize(24);
+    text(winMessage, width / 2, height / 2 + 30);
+  }
+}
+
+function mousePressed() {
+  if (gameState === "GAMEOVER") return; 
+  for (let btn of buttons) {
+    btn.click(mouseX, mouseY);
+  }
+}
+
+function checkCollision(attacker, defender) {
+  if (attacker.isAttacking && !attacker.hasHit) {
+    let reach = (attacker.currentAttack === "UPPER") ? 35 : 45;
+    let attackX = attacker.x + (attacker.dir * reach);
+    let attackY = attacker.y - 20;
+    if (attacker.currentAttack === "UPPER") attackY -= 15;
+    
+    let d = dist(attackX, attackY, defender.x, defender.y - 20);
+    
+    if (d < 35) {
+      defender.getHit(attacker.dir, attacker.currentAttack);
+      attacker.hasHit = true;
+      spawnHitEffect(attackX, attackY);
+    }
+  }
+}
+
+function spawnHitEffect(x, y) {
+  for (let i = 0; i < 15; i++) {
+    particles.push(new Particle(x, y));
+  }
+}
+
+function checkGameOver() {
+  if (p1.hp <= 0 || p2.hp <= 0) {
+    gameState = "GAMEOVER";
+    if (p1.hp <= 0 && p2.hp <= 0) winMessage = "DRAW GAME";
+    else if (p1.hp <= 0) winMessage = "P2 (RED) WIN!";
+    else winMessage = "P1 (BLUE) WIN!";
+  }
+}
+
+function drawUI() {
+  // 下部パネル
+  fill(50, 200);
+  noStroke();
+  rect(0, 400, width, 100);
+  
+  fill(255);
+  textSize(16);
+  textAlign(LEFT, CENTER);
+  text(`P1 Action: ${p1.nextAction}`, 20, 415);
+  text(`GameState: ${gameState}`, 20, 445);
+  
+  if (p2.hitStun > 0) {
+    fill(255, 100, 100);
+    text(`P2 STUNNED: ${p2.hitStun}f`, 180, 415);
+  }
+  
+  textAlign(CENTER, CENTER);
+  if (p1.combo > 0) {
+    fill(0, 120, 255); textSize(24); text(`P1: ${p1.combo} HITS!`, width/4, 110);
+  }
+  if (p2.combo > 0) {
+    fill(255, 50, 50); textSize(24); text(`P2: ${p2.combo} HITS!`, (width/4)*3, 110);
+  }
+  
+  // HPゲージ
+  stroke(0); strokeWeight(2);
+  fill(100); rect(40, 30, 300, 20);
+  fill(0, 150, 255); rect(40, 30, map(p1.hp, 0, 100, 0, 300), 20);
+  
+  fill(100); rect(460, 30, 300, 20);
+  fill(255, 50, 50); rect(460 + (300 - map(p2.hp, 0, 100, 0, 300)), 30, map(p2.hp, 0, 100, 0, 300), 20);
+  
+  fill(255); noStroke(); textSize(14);
+  textAlign(LEFT, CENTER); text("P1 HP", 45, 40);
+  textAlign(RIGHT, CENTER); text("HP P2", 755, 40);
+  
+  if (gameState !== "GAMEOVER") {
+    for (let btn of buttons) {
+      btn.display();
+    }
+  }
+}
+
+class Particle {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.vx = random(-4, 4); this.vy = random(-4, 4);
+    this.alpha = 255; this.size = random(4, 8);
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.alpha -= 10; }
+  display() {
+    push(); noStroke(); fill(255, random(150, 255), 0, this.alpha);
+    ellipse(this.x, this.y, this.size); pop();
+  }
+  isDead() { return this.alpha <= 0; }
+}
+
+class Character {
+  constructor(x, y, col, dir) {
+    this.x = x; this.y = y; this.col = col; this.dir = dir;
+    this.vx = 0; this.vy = 0;
+    this.gravity = 0.15;
+    this.nextAction = "NONE";
+    this.prevAction = "NONE";
+    this.isAttacking = false;
+    this.currentAttack = "NONE";
+    this.hasHit = false;
+    this.hitStun = 0;
+    this.combo = 0;
+    this.hp = 100; 
+  }
+  
+  forceLookAt(target) {
+    if (this.x < target.x) this.dir = 1;
+    else this.dir = -1;
+  }
+  
+  lookAt(target) {
+    if (this.isAttacking || this.nextAction === "ATTACK" || this.nextAction === "UPPER" || this.prevAction === "ATTACK" || this.prevAction === "UPPER") {
+      return; 
+    }
+    this.forceLookAt(target);
+  }
+  
+  setNextAction(action) {
+    if (action === "AIR_DASH" && this.y >= 350) return; 
+    if (action === "DASH" && this.y < 350) return;     
+    this.nextAction = action;
+  }
+  
+  resetAction() {
+    this.prevAction = this.nextAction;
+    this.nextAction = "NONE";
+    this.isAttacking = false;
+    this.currentAttack = "NONE";
+    this.hasHit = false;
+    this.vx = 0;
+  }
+  
+  getHit(attackDir, attackType) {
+    this.combo++;
+    if (attackType === "UPPER") {
+      this.hitStun = 65;         
+      this.vx = attackDir * 0.5; 
+      this.vy = -4.5;            
+      this.hp -= 15; 
+    } else {
+      this.hitStun = 40;
+      this.vx = attackDir * 4;   
+      this.vy = -4; 
+      this.hp -= 10; 
+    }
+    this.hp = max(0, this.hp); 
+  }
+  
+  drawPreview() {
+    let simX = this.x;
+    let simY = this.y;
+    let simVx = this.vx;
+    let simVy = this.vy;
+    let simHitStun = this.hitStun;
+    let simIsAttacking = false;
+    let simAttackType = "NONE";
+    
+    for (let i = 0; i < maxActionTime; i++) {
+      if (simHitStun > 0) {
+        simHitStun--;
+      } else {
+        if (i < 10) {
+          if (this.nextAction === "MOVE") {
+            simVx = this.dir * 4;
+          } else if (this.nextAction === "DASH") {
+            simVx = this.dir * 7.5; 
+          } else if (this.nextAction === "JUMP" && simY >= 350) {
+            simVy = -6.5; simVx = this.dir * 0.8; 
+          } else if (this.nextAction === "AIR_DASH") {
+            simVy = 0; simVx = this.dir * 6.0; 
+          } else if (this.nextAction === "ATTACK") {
+            simIsAttacking = true; simAttackType = "ATTACK"; simVx = this.dir * 1.5;
+          } else if (this.nextAction === "UPPER") {
+            simIsAttacking = true; simAttackType = "UPPER"; simVx = this.dir * 0.5;
+          }
+        }
+      }
+      
+      simX += simVx;
+      simY += simVy;
+      
+      if (simY < 350) {
+        if (this.nextAction === "AIR_DASH") {
+          simVy = 0; if (i >= 10) simVx *= 0.85;
+        } else {
+          simVy += this.gravity;
+        }
+      } else {
+        simY = 350; simVy = 0;
+        if (simHitStun <= 0) simVx *= 0.8;
+      }
+      simX = constrain(simX, 20, width - 20);
+    }
+    
+    push();
+    translate(simX, simY);
+    
+    let r = red(this.col);
+    let g = green(this.col);
+    let b = blue(this.col);
+    
+    if (simHitStun > 0) {
+      stroke(255, 150, 150, 100);
+      rotate(radians(this.dir * 15));
+    } else {
+      stroke(r, g, b, 100);
+    }
+    
+    strokeWeight(4); noFill();
+    line(0, 0, 0, -40); ellipse(0, -50, 15, 15); 
+    
+    strokeWeight(5);
+    if (simIsAttacking) {
+      if (simAttackType === "UPPER") {
+        line(0, -25, this.dir * 25, -55);
+        stroke(255, 255, 0, 100); strokeWeight(3); line(0, -25, this.dir * 35, -60);
+      } else {
+        line(0, -25, this.dir * 35, -25);
+        stroke(255, 255, 0, 100); strokeWeight(3); line(0, -25, this.dir * 45, -25);
+      }
+    } else {
+      if (simHitStun > 0) line(0, -25, -this.dir * 15, -30);
+      else line(0, -25, this.dir * 15, -10);
+    }
+    pop();
+  }
+  
+  update() {
+    if (this.y >= 350 && this.hitStun <= 0) this.combo = 0;
+    
+    if (this.hitStun > 0) {
+      this.hitStun--;
+    } else {
+      if (actionTimer > maxActionTime - 10) {
+        if (this.nextAction === "MOVE") {
+          this.vx = this.dir * 4;
+        } else if (this.nextAction === "DASH") {
+          this.vx = this.dir * 7.5; 
+        } else if (this.nextAction === "JUMP" && this.y >= 350) {
+          this.vy = -6.5; this.vx = this.dir * 0.8; 
+        } else if (this.nextAction === "AIR_DASH") {
+          this.vy = 0; this.vx = this.dir * 6.0; 
+        } else if (this.nextAction === "ATTACK") {
+          this.isAttacking = true; this.currentAttack = "ATTACK";this.vx = this.dir * 1.5;} else if (this.nextAction === "UPPER") {this.isAttacking = true; this.currentAttack = "UPPER";this.vx = this.dir * 0.5;}}}this.x += this.vx;this.y += this.vy;if (this.y < 350) {if (this.nextAction === "AIR_DASH") {this.vy = 0; if (actionTimer <= maxActionTime - 10) this.vx *= 0.85;} else {this.vy += this.gravity;}} else {this.y = 350; this.vy = 0;if (this.hitStun <= 0) this.vx *= 0.8;}this.x = constrain(this.x, 20, width - 20);}display() {push();translate(this.x, this.y);if (this.hitStun > 0) {stroke(255, 150, 150);rotate(radians(this.dir * 15));} else {stroke(this.col);}strokeWeight(6); noFill();line(0, 0, 0, -40); ellipse(0, -50, 15, 15);strokeWeight(5);if (this.isAttacking) {if (this.currentAttack === "UPPER") {line(0, -25, this.dir * 25, -55);stroke(255, 255, 0); strokeWeight(4); line(0, -25, this.dir * 35, -60);} else {line(0, -25, this.dir * 35, -25);stroke(255, 255, 0); strokeWeight(4); line(0, -25, this.dir * 45, -25);}} else {if (this.hitStun > 0) {line(0, -25, -this.dir * 15, -30);} else {line(0, -25, this.dir * 15, -10);}}pop();}}class Button {constructor(x, y, w, h, label, onClick) {this.x = x; this.y = y; this.w = w; this.h = h; this.label = label; this.onClick = onClick;}display() {fill(100); stroke(255); strokeWeight(1);rect(this.x, this.y, this.w, this.h, 5);fill(255); noStroke(); textSize(12); textAlign(CENTER, CENTER);text(this.label, this.x + this.w/2, this.y + this.h/2);}click(mx, my) {if (mx > this.x && mx < this.x + this.w && my > this.y && my < this.y + this.h) this.onClick();}}</script>
+</body>
+</html>
