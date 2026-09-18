@@ -2,21 +2,26 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>敷地勇海さんのゲーム</title>
+  <title>p5.js ゲーム作品</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
     body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
     h1 { font-size: 1.2rem; margin-bottom: 5px; }
     p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; }
+    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
     .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
+    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <a href="index.html" class="back-link">← 回覧板に戻る</a>
-  <h1>敷地勇海 (2年 番号:4)</h1>
+  <a href="index.html" class="back-link">← 一覧に戻る</a>
+  <h1>作者: 敷地</h1>
   <p>aim insanity</p>
+  
   <script>let camX = 0, camY = -50, camZ = 300; // プレイヤーの位置
 let yaw = -
 90, pitch = 0;              // 視点角度
@@ -309,5 +314,305 @@ function draw() {
 }
 
 </script>
+
+  <div class="code-container">
+    <h3>ソースコード</h3>
+    <pre><code class="language-javascript">let camX = 0, camY = -50, camZ = 300; // プレイヤーの位置
+let yaw = -
+90, pitch = 0;              // 視点角度
+let moveSpeed = 4;                     // 移動速度
+let sensitivity = 0.15;                // マウス感度
+
+// --- 操作設定 ---
+let invertY = true;                    // trueで上下反転、falseで通常操作
+
+let bullets = [];
+let bulletSpeed = 25;                  // 弾の速度
+let recoil = 0;                        // 銃の反動（リコイル）用
+
+// --- 敵（エネミー）の設定 ---
+let enemies = [];
+let maxEnemies = 3;                    // 同時に存在する敵の数
+let enemySpeed = 1.5;                  // 敵が迫ってくる速度
+let enemySize = 35;                    // 的の大きさ
+
+let isGameOver = false;
+
+// ★絶対に画面最前面に表示するための2D専用レイヤー
+let hudLayer;
+
+function setup() {
+  createCanvas(800, 600, WEBGL);
+  
+  // 画面と同じサイズの2D透明キャンバスを作成
+  hudLayer = createGraphics(800, 600);
+  
+  // 画面クリックでポインターロック
+  let canvasElement = document.getElementById(&#039;defaultCanvas0&#039;);
+  if (canvasElement) {
+    canvasElement.addEventListener(&#039;click&#039;, () =&gt; {
+      if (isGameOver) {
+        resetGame();
+      } else {
+        canvasElement.requestPointerLock();
+      }
+    });
+  }
+
+  // 最初に敵を生成
+  resetGame();
+}
+
+// ゲームのリセット処理
+function resetGame() {
+  camX = 0; camY = -50; camZ = 300;
+  yaw = -90; pitch = 0;
+  bullets = [];
+  enemies = [];
+  isGameOver = false;
+  
+  for (let i = 0; i &lt; maxEnemies; i++) {
+    spawnEnemy();
+  }
+}
+
+// 敵をランダムな位置に復活させる
+function spawnEnemy() {
+  enemies.push({
+    x: random(-400, 400),
+    y: -50,
+    z: random(-600, -200)
+  });
+}
+
+function mousePressed() {
+  if (isGameOver) return;
+  if (!document.pointerLockElement) return; // ロック中のみ撃てる
+  
+  let lookX = cos(radians(yaw)) * cos(radians(pitch));
+  let lookY = sin(radians(pitch));
+  let lookZ = sin(radians(yaw)) * cos(radians(pitch));
+  
+  bullets.push({
+    x: camX, 
+    y: camY + 15, 
+    z: camZ,
+    vx: lookX * bulletSpeed,
+    vy: lookY * bulletSpeed,
+    vz: lookZ * bulletSpeed,
+    life: 60
+  });
+
+  // 撃った瞬間に強い反動（銃が後ろに下がるピクセル数）をセット
+  recoil = 45; 
+}
+
+function draw() {
+  if (isGameOver) {
+    // 【ゲームオーバー画面】
+    background(100, 0, 0);
+    push();
+    resetMatrix();
+    ortho(-width/2, width/2, -height/2, height/2, -1, 1);
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(32);
+    text(&quot;GAME OVER&quot;, 0, -20);
+    textSize(16);
+    text(&quot;Click anywhere to Restart&quot;, 0, 20);
+    pop();
+    return;
+  }
+
+  background(20, 25, 35); // ナイトミッション風の空
+  
+  // 1. マウスがロックされている時だけ視点を動かす
+  if (document.pointerLockElement) {
+    yaw += movedX * sensitivity;
+    
+    if (invertY) {
+      pitch += movedY * sensitivity;
+    } else {
+      pitch -= movedY * sensitivity;
+    }
+    
+    pitch = constrain(pitch, -89, 89);
+  }
+  
+  let lookX = cos(radians(yaw)) * cos(radians(pitch));
+  let lookY = sin(radians(pitch));
+  let lookZ = sin(radians(yaw)) * cos(radians(pitch));
+  
+  // 2. キーボード移動
+  let forwardX = cos(radians(yaw));
+  let forwardZ = sin(radians(yaw));
+  let rightX = cos(radians(yaw + 90));
+  let rightZ = sin(radians(yaw + 90));
+  
+  if (keyIsDown(87)) { camX += forwardX * moveSpeed; camZ += forwardZ * moveSpeed; } // W
+  if (keyIsDown(83)) { camX -= forwardX * moveSpeed; camZ -= forwardZ * moveSpeed; } // S
+  if (keyIsDown(65)) { camX -= rightX * moveSpeed; camZ -= rightZ * moveSpeed; }    // A
+  if (keyIsDown(68)) { camX += rightX * moveSpeed; camZ += rightZ * moveSpeed; }    // D
+  
+  // 3. カメラの設定
+  camera(
+    camX, camY, camZ, 
+    camX + lookX, camY + lookY, camZ + lookZ, 
+    0, 1, 0
+  );
+  
+  // ライトの追加
+  ambientLight(80);
+  directionalLight(255, 255, 255, 0.5, 1, -0.5);
+  
+  // 地面
+  push();
+  rotateX(HALF_PI);
+  fill(40, 50, 60);
+  stroke(0, 255, 200, 100);
+  plane(2000, 2000);
+  pop();
+  
+  // 4. 敵の移動 ＆ プレイヤーへの衝突判定
+  for (let i = 0; i &lt; enemies.length; i++) {
+    let e = enemies[i];
+    
+    let dx = camX - e.x;
+    let dz = camZ - e.z;
+    let distance = dist(e.x, e.z, camX, camZ);
+    
+    if (distance &gt; 5) {
+      e.x += (dx / distance) * enemySpeed;
+      e.z += (dz / distance) * enemySpeed;
+    }
+    
+    if (distance &lt; enemySize / 2 + 15) {
+      isGameOver = true;
+      document.exitPointerLock();
+    }
+    
+    push();
+    translate(e.x, e.y, e.z);
+    ambientMaterial(255, 50, 50);
+    stroke(0);
+    box(enemySize);
+    pop();
+  }
+  
+  // 5. 弾の移動 ＆ 敵への当たり判定
+  for (let i = bullets.length - 1; i &gt;= 0; i--) {
+    let b = bullets[i];
+    b.x += b.vx;
+    b.y += b.vy;
+    b.z += b.vz;
+    b.life--;
+    
+    let bulletHit = false;
+    
+    for (let j = enemies.length - 1; j &gt;= 0; j--) {
+      let e = enemies[j];
+      
+      if (b.x &gt; e.x - enemySize/2 &amp;&amp; b.x &lt; e.x + enemySize/2 &amp;&amp;
+          b.y &gt; e.y - enemySize/2 &amp;&amp; b.y &lt; e.y + enemySize/2 &amp;&amp;
+          b.z &gt; e.z - enemySize/2 &amp;&amp; b.z &lt; e.z + enemySize/2) {
+        
+        enemies.splice(j, 1);
+        spawnEnemy();
+        bulletHit = true;
+        break; 
+      }
+    }
+    
+    if (bulletHit || b.life &lt;= 0) {
+      bullets.splice(i, 1);
+      continue;
+    }
+    
+    push();
+    translate(b.x, b.y, b.z);
+    ambientMaterial(255, 200, 0);
+    noStroke();
+    sphere(4); 
+    pop();
+  }
+  
+  // 銃の反動アニメーション（毎フレーム元の位置へ戻る）
+  recoil = lerp(recoil, 0, 0.15);
+  
+  // 6. ★【2D HUDレイヤーの描画】
+  // 透明キャンバスを毎フレームクリアして描き直す
+  hudLayer.clear();
+  
+  // --- ① クロスヘアの描画（画面の中心 400, 300） ---
+  hudLayer.noStroke();
+  hudLayer.fill(0);
+  hudLayer.ellipse(400, 300, 8, 8);  // 外側の黒縁
+  hudLayer.fill(255);
+  hudLayer.ellipse(400, 300, 4, 4);  // 内側の白ドット
+  
+  // --- ② カッコいい2Dの銃を画面右下に描画 ---
+  hudLayer.push();
+  // 銃の基準位置（右下）に、リコイル（反動）の動きを加算
+  // 撃った瞬間は recoil の値によって後ろ（下・右）にガクッとズレる
+  let gunX = 550 + recoil * 0.4;
+  let gunY = 400 + recoil * 0.8;
+  
+  // 銃の影（立体感を出すための後ろパーツ）
+  hudLayer.fill(20, 20, 25);
+  hudLayer.rect(gunX + 10, gunY + 40, 65, 150, 5); // グリップの影
+  
+  // 銃のメインボディ（ダークグレーのアサルトフレーム）
+  hudLayer.fill(45, 50, 60);
+  hudLayer.stroke(30, 32, 40);
+  hudLayer.strokeWeight(3);
+  hudLayer.rect(gunX, gunY, 180, 50, 4); // メインフレーム
+  
+  // ハンドガード・バレル（銃身の先端・シルバー）
+  hudLayer.fill(120, 125, 135);
+  hudLayer.rect(gunX - 70, gunY + 10, 70, 25, 2); // ロングバレル
+  hudLayer.fill(20);
+  hudLayer.rect(gunX - 85, gunY + 15, 15, 15, 1); // 銃口（マズル）
+  
+  // ホロサイト／スコープ（照準器）
+  hudLayer.fill(30);
+  hudLayer.rect(gunX + 60, gunY - 20, 50, 20, 3);
+  hudLayer.fill(0, 255, 150); // 緑に不気味に光るレンズ
+  hudLayer.rect(gunX + 60, gunY - 15, 5, 10);
+  
+  // 特殊レーザーサイト（赤いラインのデザイン）
+  hudLayer.noStroke();
+  hudLayer.fill(255, 50, 50);
+  hudLayer.rect(gunX + 15, gunY + 22, 100, 5);
+  
+  // マガジン（傾いた弾倉パーツ）
+  hudLayer.push();
+  hudLayer.translate(gunX + 40, gunY + 45);
+  hudLayer.rotate(radians(15));
+  hudLayer.fill(25, 25, 30);
+  hudLayer.stroke(15);
+  hudLayer.rect(0, 0, 35, 70, 4);
+  hudLayer.pop();
+  
+  // グリップ（持ち手）
+  hudLayer.fill(30, 32, 38);
+  hudLayer.rect(gunX + 120, gunY + 45, 40, 90, 8);
+  
+  hudLayer.pop();
+  
+  // 7. 完成した透明な2D HUDシートを、3D画面の最前面にペタッと等倍で貼り付ける
+  push();
+  resetMatrix();
+  ortho(-width/2, width/2, -height/2, height/2, -1, 1);
+  // 画像として画面中央に描画
+  image(hudLayer, -width/2, -height/2);
+  pop();
+}
+
+</code></pre>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>
