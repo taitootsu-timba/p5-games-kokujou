@@ -6,15 +6,92 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
   <style>
-    body { margin: 0; padding: 20px; background: #121212; color: #fff; font-family: sans-serif; text-align: center; }
-    h1 { font-size: 1.2rem; margin-bottom: 5px; }
-    p { color: #aaa; margin-bottom: 20px; }
-    canvas { box-shadow: 0 4px 10px rgba(0,0,0,0.5); border-radius: 4px; margin-bottom: 30px; }
-    .back-link { display: inline-block; margin-bottom: 20px; color: #4fc3f7; text-decoration: none; }
-    .back-link:hover { text-decoration: underline; }
-    .code-container { max-width: 800px; margin: 0 auto 40px auto; text-align: left; background: #272822; border-radius: 6px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-    .code-container h3 { background: #1e1e1e; margin: 0; padding: 10px 15px; font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; }
-    pre { margin: 0 !important; padding: 15px !important; font-size: 0.85rem; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-bottom: 5px;
+    }
+    p {
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #4fc3f7;
+      text-decoration: none;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    #game-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 40px;
+    }
+    #game-container canvas {
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-radius: 4px;
+    }
+    .code-container {
+      max-width: 800px;
+      margin: 0 auto 40px auto;
+      text-align: left;
+      background: #272822;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #1e1e1e;
+      margin: 0;
+      padding: 8px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-header span {
+      font-size: 0.85rem;
+      color: #888;
+      font-weight: bold;
+    }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #ccc;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .copy-btn:hover {
+      background: #333;
+      border-color: #666;
+      color: #fff;
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+    pre {
+      margin: 0 !important;
+      padding: 15px !important;
+      font-size: 0.85rem;
+      max-height: 500px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -22,237 +99,20 @@
   <h1>作者: 金光</h1>
   <p>テトリス</p>
   
-  <script>const COLS = 10;
-const ROWS = 20;
-const BLOCK_SIZE = 30; // 1マスのサイズ（ピクセル）
+  <!-- ゲーム画面を配置する領域 -->
+  <div id="game-container"></div>
 
-let field = [];
-let currentPiece;
-let score = 0;
-let gameOver = false;
-let fallInterval = 30; // 自動落下の速度（フレーム数）
-
-// 7種類のテトリミノの形状データ
-const SHAPES = [
-  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
-  [[1,1],[1,1]],                             // O
-  [[0,1,0],[1,1,1],[0,0,0]],                 // T
-  [[0,1,1],[1,1,0],[0,0,0]],                 // S
-  [[1,1,0],[0,1,1],[0,0,0]],                 // Z
-  [[1,0,0],[1,1,1],[0,0,0]],                 // J
-  [[0,0,1],[1,1,1],[0,0,0]]                  // L
-];
-
-// ブロックの色（鮮やかなパステル調）
-const COLORS = [
-  '#00f0f0', // シアン (I)
-  '#f0f000', // イエロー (O)
-  '#a000f0', // パープル (T)
-  '#00f000', // グリーン (S)
-  '#f00000', // レッド (Z)
-  '#0000f0', // ブルー (J)
-  '#f0a000'  // オレンジ (L)
-];
-
-function setup() {
-  createCanvas(COLS * BLOCK_SIZE + 150, ROWS * BLOCK_SIZE);
-  
-  // フィールドの初期化
-  for (let r = 0; r < ROWS; r++) {
-    field[r] = Array(COLS).fill(0);
-  }
-  
-  spawnPiece();
-}
-
-function draw() {
-  background(26, 26, 36); // ダークネイビーの背景
-  
-  if (!gameOver) {
-    // 時間経過による自動落下
-    if (frameCount % fallInterval === 0) {
-      if (!movePiece(0, 1)) {
-        lockPiece();
-        clearLines();
-        spawnPiece();
-      }
-    }
-  }
-
-  drawField();
-  drawPiece();
-  drawUI();
-}
-
-// 新しいブロックを生成
-function spawnPiece() {
-  let type = floor(random(SHAPES.length));
-  currentPiece = {
-    shape: SHAPES[type],
-    color: COLORS[type],
-    x: floor(COLS / 2) - floor(SHAPES[type].length / 2),
-    y: 0
-  };
-
-  if (checkCollision(currentPiece.x, currentPiece.y, currentPiece.shape)) {
-    gameOver = true;
-  }
-}
-
-// 移動処理
-function movePiece(dx, dy) {
-  if (!checkCollision(currentPiece.x + dx, currentPiece.y + dy, currentPiece.shape)) {
-    currentPiece.x += dx;
-    currentPiece.y += dy;
-    return true;
-  }
-  return false;
-}
-
-// 回転処理
-function rotatePiece() {
-  let matrix = currentPiece.shape;
-  let n = matrix.length;
-  let rotated = Array.from({ length: n }, () => Array(n).fill(0));
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      rotated[c][n - 1 - r] = matrix[r][c];
-    }
-  }
-  
-  if (!checkCollision(currentPiece.x, currentPiece.y, rotated)) {
-    currentPiece.shape = rotated;
-  }
-}
-
-// 衝突判定
-function checkCollision(tx, ty, matrix) {
-  for (let r = 0; r < matrix.length; r++) {
-    for (let c = 0; c < matrix[r].length; c++) {
-      if (matrix[r][c]) {
-        let fx = tx + c;
-        let fy = ty + r;
-        
-        if (fx < 0 || fx >= COLS || fy >= ROWS) return true;
-        if (fy >= 0 && field[fy][fx]) return true;
-      }
-    }
-  }
-  return false;
-}
-
-// ブロックをフィールドに固定
-function lockPiece() {
-  let matrix = currentPiece.shape;
-  for (let r = 0; r < matrix.length; r++) {
-    for (let c = 0; c < matrix[r].length; c++) {
-      if (matrix[r][c]) {
-        let fy = currentPiece.y + r;
-        let fx = currentPiece.x + c;
-        if (fy >= 0) {
-          field[fy][fx] = currentPiece.color;
-        }
-      }
-    }
-  }
-}
-
-// ライン消去
-function clearLines() {
-  for (let r = ROWS - 1; r >= 0; r--) {
-    if (field[r].every(cell => cell !== 0)) {
-      field.splice(r, 1);
-      field.unshift(Array(COLS).fill(0));
-      score += 100;
-      r++;
-    }
-  }
-}
-
-// 【修正箇所】操作用のキーイベント
-function keyPressed() {
-  if (gameOver) return;
-  
-  // 文字列ベースのキー判定に変更（環境によるブレを防止）
-  if (key === 'ArrowLeft') {
-    movePiece(-1, 0);
-    return false; // ブラウザの標準スクロールを防ぐ
-  } else if (key === 'ArrowRight') {
-    movePiece(1, 0);
-    return false;
-  } else if (key === 'ArrowDown') {
-    movePiece(0, 1);
-    return false;
-  } else if (key === 'ArrowUp') {
-    rotatePiece();
-    return false;
-  }
-}
-
-// フィールドの描画
-function drawField() {
-  stroke(40);
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (field[r][c]) {
-        fill(field[r][c]);
-      } else {
-        fill(40, 40, 50);
-      }
-      rect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 4);
-    }
-  }
-}
-
-// 現在落下中のブロックの描画
-function drawPiece() {
-  let matrix = currentPiece.shape;
-  fill(currentPiece.color);
-  stroke(255, 100);
-  for (let r = 0; r < matrix.length; r++) {
-    for (let c = 0; c < matrix[r].length; c++) {
-      if (matrix[r][c]) {
-        let fy = currentPiece.y + r;
-        if (fy >= 0) {
-          rect((currentPiece.x + c) * BLOCK_SIZE, fy * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 4);
-        }
-      }
-    }
-  }
-}
-
-// UIの描画
-function drawUI() {
-  fill(255);
-  noStroke();
-  textSize(20);
-  textAlign(LEFT, TOP);
-  text("TETRIS", COLS * BLOCK_SIZE + 20, 30);
-  
-  textSize(16);
-  text(`SCORE:\n${score}`, COLS * BLOCK_SIZE + 20, 80);
-  
-  textSize(12);
-  text("CONTROLS:\n← / → : 移動\n↑ : 回転\n↓ : 加速", COLS * BLOCK_SIZE + 20, 200);
-
-  if (gameOver) {
-    fill(0, 0, 0, 200);
-    rect(0, 0, width, height);
-    
-    fill(255, 50, 50);
-    textSize(32);
-    textAlign(CENTER, CENTER);
-    text("GAME OVER", width / 2, height / 2 - 20);
-    
-    fill(255);
-    textSize(16);
-    text(`Final Score: ${score}`, width / 2, height / 2 + 20);
-  }
-}</script>
-
+  <!-- ソースコード表示領域（ゲーム画面の下） -->
   <div class="code-container">
-    <h3>ソースコード</h3>
-    <pre><code class="language-javascript">const COLS = 10;
+    <div class="code-header">
+      <span>ソースコード</span>
+      <button class="copy-btn" id="copy-btn" title="コードをコピー" aria-label="コードをコピー">
+        <svg id="copy-icon" viewBox="0 0 24 24">
+          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>
+      </button>
+    </div>
+    <pre><code id="source-code" class="language-javascript">const COLS = 10;
 const ROWS = 20;
 const BLOCK_SIZE = 30; // 1マスのサイズ（ピクセル）
 
@@ -484,5 +344,268 @@ function drawUI() {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+  <script>
+    // コピー機能の実装
+    const copyBtn = document.getElementById("copy-btn");
+    const copyIcon = document.getElementById("copy-icon");
+    const originalSvg = '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>';
+    const checkSvg = '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>';
+
+    copyBtn.addEventListener("click", function() {
+      const codeText = document.getElementById("source-code").textContent;
+      navigator.clipboard.writeText(codeText).then(function() {
+        copyIcon.innerHTML = checkSvg;
+        copyBtn.style.color = "#4fc3f7";
+        setTimeout(function() {
+          copyIcon.innerHTML = originalSvg;
+          copyBtn.style.color = "";
+        }, 2000);
+      });
+    });
+
+    // 生成されたキャンバスを #game-container の中に格納する
+    function ensureCanvasInContainer() {
+      const container = document.getElementById("game-container");
+      const canvas = document.querySelector("canvas");
+      if (canvas && canvas.parentElement !== container) {
+        container.appendChild(canvas);
+      }
+    }
+    const canvasObserver = new MutationObserver(function() {
+      ensureCanvasInContainer();
+    });
+    canvasObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("load", ensureCanvasInContainer);
+  </script>
+
+  <!-- 生徒のゲームスクリプト -->
+  <script>const COLS = 10;
+const ROWS = 20;
+const BLOCK_SIZE = 30; // 1マスのサイズ（ピクセル）
+
+let field = [];
+let currentPiece;
+let score = 0;
+let gameOver = false;
+let fallInterval = 30; // 自動落下の速度（フレーム数）
+
+// 7種類のテトリミノの形状データ
+const SHAPES = [
+  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], // I
+  [[1,1],[1,1]],                             // O
+  [[0,1,0],[1,1,1],[0,0,0]],                 // T
+  [[0,1,1],[1,1,0],[0,0,0]],                 // S
+  [[1,1,0],[0,1,1],[0,0,0]],                 // Z
+  [[1,0,0],[1,1,1],[0,0,0]],                 // J
+  [[0,0,1],[1,1,1],[0,0,0]]                  // L
+];
+
+// ブロックの色（鮮やかなパステル調）
+const COLORS = [
+  '#00f0f0', // シアン (I)
+  '#f0f000', // イエロー (O)
+  '#a000f0', // パープル (T)
+  '#00f000', // グリーン (S)
+  '#f00000', // レッド (Z)
+  '#0000f0', // ブルー (J)
+  '#f0a000'  // オレンジ (L)
+];
+
+function setup() {
+  createCanvas(COLS * BLOCK_SIZE + 150, ROWS * BLOCK_SIZE);
+  
+  // フィールドの初期化
+  for (let r = 0; r < ROWS; r++) {
+    field[r] = Array(COLS).fill(0);
+  }
+  
+  spawnPiece();
+}
+
+function draw() {
+  background(26, 26, 36); // ダークネイビーの背景
+  
+  if (!gameOver) {
+    // 時間経過による自動落下
+    if (frameCount % fallInterval === 0) {
+      if (!movePiece(0, 1)) {
+        lockPiece();
+        clearLines();
+        spawnPiece();
+      }
+    }
+  }
+
+  drawField();
+  drawPiece();
+  drawUI();
+}
+
+// 新しいブロックを生成
+function spawnPiece() {
+  let type = floor(random(SHAPES.length));
+  currentPiece = {
+    shape: SHAPES[type],
+    color: COLORS[type],
+    x: floor(COLS / 2) - floor(SHAPES[type].length / 2),
+    y: 0
+  };
+
+  if (checkCollision(currentPiece.x, currentPiece.y, currentPiece.shape)) {
+    gameOver = true;
+  }
+}
+
+// 移動処理
+function movePiece(dx, dy) {
+  if (!checkCollision(currentPiece.x + dx, currentPiece.y + dy, currentPiece.shape)) {
+    currentPiece.x += dx;
+    currentPiece.y += dy;
+    return true;
+  }
+  return false;
+}
+
+// 回転処理
+function rotatePiece() {
+  let matrix = currentPiece.shape;
+  let n = matrix.length;
+  let rotated = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      rotated[c][n - 1 - r] = matrix[r][c];
+    }
+  }
+  
+  if (!checkCollision(currentPiece.x, currentPiece.y, rotated)) {
+    currentPiece.shape = rotated;
+  }
+}
+
+// 衝突判定
+function checkCollision(tx, ty, matrix) {
+  for (let r = 0; r < matrix.length; r++) {
+    for (let c = 0; c < matrix[r].length; c++) {
+      if (matrix[r][c]) {
+        let fx = tx + c;
+        let fy = ty + r;
+        
+        if (fx < 0 || fx >= COLS || fy >= ROWS) return true;
+        if (fy >= 0 && field[fy][fx]) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ブロックをフィールドに固定
+function lockPiece() {
+  let matrix = currentPiece.shape;
+  for (let r = 0; r < matrix.length; r++) {
+    for (let c = 0; c < matrix[r].length; c++) {
+      if (matrix[r][c]) {
+        let fy = currentPiece.y + r;
+        let fx = currentPiece.x + c;
+        if (fy >= 0) {
+          field[fy][fx] = currentPiece.color;
+        }
+      }
+    }
+  }
+}
+
+// ライン消去
+function clearLines() {
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (field[r].every(cell => cell !== 0)) {
+      field.splice(r, 1);
+      field.unshift(Array(COLS).fill(0));
+      score += 100;
+      r++;
+    }
+  }
+}
+
+// 【修正箇所】操作用のキーイベント
+function keyPressed() {
+  if (gameOver) return;
+  
+  // 文字列ベースのキー判定に変更（環境によるブレを防止）
+  if (key === 'ArrowLeft') {
+    movePiece(-1, 0);
+    return false; // ブラウザの標準スクロールを防ぐ
+  } else if (key === 'ArrowRight') {
+    movePiece(1, 0);
+    return false;
+  } else if (key === 'ArrowDown') {
+    movePiece(0, 1);
+    return false;
+  } else if (key === 'ArrowUp') {
+    rotatePiece();
+    return false;
+  }
+}
+
+// フィールドの描画
+function drawField() {
+  stroke(40);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (field[r][c]) {
+        fill(field[r][c]);
+      } else {
+        fill(40, 40, 50);
+      }
+      rect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 4);
+    }
+  }
+}
+
+// 現在落下中のブロックの描画
+function drawPiece() {
+  let matrix = currentPiece.shape;
+  fill(currentPiece.color);
+  stroke(255, 100);
+  for (let r = 0; r < matrix.length; r++) {
+    for (let c = 0; c < matrix[r].length; c++) {
+      if (matrix[r][c]) {
+        let fy = currentPiece.y + r;
+        if (fy >= 0) {
+          rect((currentPiece.x + c) * BLOCK_SIZE, fy * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE, 4);
+        }
+      }
+    }
+  }
+}
+
+// UIの描画
+function drawUI() {
+  fill(255);
+  noStroke();
+  textSize(20);
+  textAlign(LEFT, TOP);
+  text("TETRIS", COLS * BLOCK_SIZE + 20, 30);
+  
+  textSize(16);
+  text(`SCORE:\n${score}`, COLS * BLOCK_SIZE + 20, 80);
+  
+  textSize(12);
+  text("CONTROLS:\n← / → : 移動\n↑ : 回転\n↓ : 加速", COLS * BLOCK_SIZE + 20, 200);
+
+  if (gameOver) {
+    fill(0, 0, 0, 200);
+    rect(0, 0, width, height);
+    
+    fill(255, 50, 50);
+    textSize(32);
+    textAlign(CENTER, CENTER);
+    text("GAME OVER", width / 2, height / 2 - 20);
+    
+    fill(255);
+    textSize(16);
+    text(`Final Score: ${score}`, width / 2, height / 2 + 20);
+  }
+}</script>
 </body>
 </html>
